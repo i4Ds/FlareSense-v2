@@ -3,3 +3,4 @@ matplotlib
 evaluate
 transformers
 torchvision
+scikit-learn
