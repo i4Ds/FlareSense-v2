@@ -4,3 +4,4 @@ evaluate
 transformers
 torchvision
 scikit-learn
+wandb
