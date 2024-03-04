@@ -1,5 +1,6 @@
 # Visualization
 import numpy as np
+
 # Modeling
 import torch
 from datasets import DatasetDict, load_dataset
@@ -94,7 +95,7 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         accelerator="gpu",
-        max_epochs=1,
+        max_epochs=5,
         logger=wandb_logger,
         callbacks=[checkpoint_callback_loss, checkpoint_callback_f1],
         val_check_interval=200,
