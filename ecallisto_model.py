@@ -70,9 +70,10 @@ class EcallistoBase(LightningModule):
 
 
 class EfficientNet(EcallistoBase):
-    def __init__(self, n_classes, class_weights, model_weights=None):
+    def __init__(self, n_classes, class_weights, learnig_rate, model_weights=None):
         super().__init__(n_classes=n_classes, class_weights=class_weights)
         self.efficient_net = models.efficientnet_v2_s(weights=model_weights)
+        self.learnig_rate = learnig_rate
         # Dynamically obtain the in_features from the current classifier layer
         in_features = self.efficient_net.classifier[1].in_features
 
@@ -88,7 +89,7 @@ class EfficientNet(EcallistoBase):
         return self.efficient_net(x)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-4)
+        return torch.optim.Adam(self.parameters(), lr=self.learnig_rate)
 
 
 class ResNet18(EcallistoBase):

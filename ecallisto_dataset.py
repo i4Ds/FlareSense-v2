@@ -124,7 +124,9 @@ class EcallistoDataset(Dataset):
 
         # Augmentation
         label = example["label"].item()
-        augmentation_prob = self.class_weights[label] / max(self.class_weights)
+        augmentation_prob = self.dataset_label_weight[label] / max(
+            self.dataset_label_weight
+        )
 
         if (
             self.data_augm_transform is not None

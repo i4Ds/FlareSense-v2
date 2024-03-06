@@ -59,9 +59,10 @@ if __name__ == "__main__":
 
     # Define augmentation
     normalize = Normalize(
-        mean=config["model"]["mean"], std=config["model"]["std"]
+        mean=config["data"]["normalization_mean"],
+        std=config["data"]["normalization_std"],
     )  # Calculated from the train dataset
-    size = tuple(config["model"]["size"])
+    size = tuple(config["model"]["input_size"])
 
     # Transforms
     base_transform = Compose(
@@ -69,12 +70,15 @@ if __name__ == "__main__":
             Resize(size),  # Resize the image
         ]
     )
-    data_augm_transform = Compose(
-        [
-            FrequencyMasking(freq_mask_param=config["data"]["freq_mask_param"]),
-            TimeMasking(time_mask_param=config["data"]["time_mask_param"]),
-        ]
-    )
+    if config["data"]["use_augmentation"]:
+        data_augm_transform = Compose(
+            [
+                FrequencyMasking(freq_mask_param=config["data"]["freq_mask_param"]),
+                TimeMasking(time_mask_param=config["data"]["time_mask_param"]),
+            ]
+        )
+    else:
+        data_augm_transform = None
 
     normalize_transform = Compose(
         [
@@ -154,10 +158,11 @@ if __name__ == "__main__":
     )
 
     # Setup Model
-    cw = ds_train.get_class_weights()
+    cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
     model = EfficientNet(
-        num_classes=len(np.unique(ds_train.get_labels())),
+        n_classes=len(np.unique(ds_train.get_labels())),
         class_weights=cw if config["general"]["use_class_weights"] else None,
+        learnig_rate=config["model"]["lr"],
     )
 
     # Trainer

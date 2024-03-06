@@ -1,17 +1,19 @@
 general:
   batch_size: 32
   max_epochs: 30
-  binary: False
+  binary: True
   use_random_sampler: False
   use_class_weights: True
 
 model:
-  mean: 0.5721
-  std: 0.1100
-  size: [224, 244]
+  input_size: [224, 244]
+  lr: 1.0e-4
 
 data:
+  normalization_mean: 0.5721
+  normalization_std: 0.1100
   train_class_to_reduce: 0
   reduction_fraction: 0.2
+  use_augmentation: False
   freq_mask_param: 30
   time_mask_param: 30
