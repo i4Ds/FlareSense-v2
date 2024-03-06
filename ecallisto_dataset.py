@@ -128,20 +128,14 @@ class EcallistoData(Dataset):
         # Augmentation
         label = example["label"].item()
         augmentation_prob = self.class_weights[label] / max(self.class_weights)
-        rand_num = random.random()
-        print(
-            f"Label: {label}, Augmentation Probability: {augmentation_prob}, Random Number: {rand_num}"
-        )
 
         if (
             self.data_augm_transform is not None
             and label != 0
-            and rand_num < augmentation_prob
+            and random.random() < augmentation_prob
         ):
-            print("Applying augmentation")
             example["image"] = self.data_augm_transform(example["image"])
         else:
-            print("No augmentation applied")
 
         # Normalization
         example["image"] = self.normalization_transform(example["image"])
