@@ -1,6 +1,10 @@
 # Modeling
+import argparse
+import sys
+
 import numpy as np
 import torch
+import yaml
 from datasets import DatasetDict, load_dataset
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -10,7 +14,11 @@ from torchaudio.transforms import FrequencyMasking, TimeMasking
 from torchvision.transforms import Compose, Normalize, Resize
 
 import wandb
-from ecallisto_dataset import EcallistoData, randomly_reduce_class_samples
+from ecallisto_dataset import (
+    EcallistoDataset,
+    randomly_reduce_class_samples,
+    EcallistoDatasetBinary,
+)
 from ecallisto_model import EfficientNet
 
 if __name__ == "__main__":
@@ -26,17 +34,34 @@ if __name__ == "__main__":
     # Mixed precision
     torch.set_float32_matmul_precision("high")
 
+    # Argument parser for config file path
+    parser = argparse.ArgumentParser(description="Training Configuration")
+    parser.add_argument(
+        "--config", type=str, required=True, help="Path to the configuration yaml file."
+    )
+    args = parser.parse_args()
+
+    # Load the configuration file
+    with open(args.config, "r") as file:
+        config = yaml.safe_load(file)
+
     # Create dataset
     ds = load_dataset("i4ds/radio-sunburst-ecallisto")
 
     dd = DatasetDict()
-    dd["train"] = randomly_reduce_class_samples(ds["train"], 0, 0.2)
+    dd["train"] = randomly_reduce_class_samples(
+        ds["train"],
+        config["data"]["train_class_to_reduce"],
+        config["data"]["reduction_fraction"],
+    )
     dd["test"] = ds["test"]
     dd["validation"] = ds["validation"]
 
     # Define augmentation
-    normalize = Normalize(mean=0.5721, std=0.1100)  # Calculated from the train dataset
-    size = (224, 244)
+    normalize = Normalize(
+        mean=config["model"]["mean"], std=config["model"]["std"]
+    )  # Calculated from the train dataset
+    size = tuple(config["model"]["size"])
 
     # Transforms
     base_transform = Compose(
@@ -46,63 +71,68 @@ if __name__ == "__main__":
     )
     data_augm_transform = Compose(
         [
-            FrequencyMasking(freq_mask_param=30),  # Apply frequency masking
-            TimeMasking(time_mask_param=30),  # Apply time masking
+            FrequencyMasking(freq_mask_param=config["data"]["freq_mask_param"]),
+            TimeMasking(time_mask_param=config["data"]["time_mask_param"]),
         ]
     )
 
     normalize_transform = Compose(
         [
-            normalize,  # Normalize the image
+            normalize,
         ]
     )
 
     # Data Loader
-    ds_train = EcallistoData(
+    dataset = (
+        EcallistoDatasetBinary if config["general"]["binary"] else EcallistoDataset
+    )
+    ds_train = dataset(
         dd["train"],
         base_transform=base_transform,
         data_augm_transform=data_augm_transform,
         normalization_transform=normalize_transform,
     )
-    ds_valid = EcallistoData(
+    ds_valid = dataset(
         dd["validation"],
         base_transform=base_transform,
         normalization_transform=normalize_transform,
     )
-    ds_test = EcallistoData(
+    ds_test = dataset(
         dd["test"],
         base_transform=base_transform,
         normalization_transform=normalize_transform,
         return_all_columns=True,
     )
 
-    # Batch size
-    BATCH_SIZE = 32
-
     # Create Data loader
-    sample_weights = ds_train.get_sample_weights()
-    sampler = WeightedRandomSampler(
-        sample_weights, num_samples=len(sample_weights), replacement=True
-    )
+    sample_weights = (
+        ds_train.get_sample_weights()
+    )  # Never binary, because we also want to detect rare radio sunbursts.
+    if config["general"]["use_random_sampler"]:
+        sampler = WeightedRandomSampler(
+            sample_weights, num_samples=len(sample_weights), replacement=True
+        )
+    else:
+        sampler = None
 
     train_dataloader = DataLoader(
         ds_train,
         sampler=sampler,
-        batch_size=BATCH_SIZE,
+        batch_size=config["general"]["batch_size"],
         num_workers=14,
-        shuffle=False,
+        shuffle=False if sampler is not None else True,
         persistent_workers=True,
     )
 
     val_dataloader = DataLoader(
         ds_valid,
-        batch_size=BATCH_SIZE,
+        batch_size=config["general"]["batch_size"],
         num_workers=14,
         shuffle=False,
         persistent_workers=True,
     )
 
-    wandb.init(entity="vincenzo-timmel")
+    wandb.init(entity="vincenzo-timmel", config=config)
     wandb_logger = WandbLogger(log_model="all")
 
     # Checkpoint to save the best model based on the lowest validation loss
@@ -124,15 +154,16 @@ if __name__ == "__main__":
     )
 
     # Setup Model
+    cw = ds_train.get_class_weights()
     model = EfficientNet(
-        len(np.unique(ds_train.get_labels())),
-        class_weights=None,  # ds_train.get_class_weights(),
+        num_classes=len(np.unique(ds_train.get_labels())),
+        class_weights=cw if config["general"]["use_class_weights"] else None,
     )
 
     # Trainer
     trainer = Trainer(
         accelerator="gpu",
-        max_epochs=30,
+        max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
         callbacks=[checkpoint_callback_loss, checkpoint_callback_f1],
         val_check_interval=200,

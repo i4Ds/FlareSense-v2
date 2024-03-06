@@ -1,6 +1,7 @@
 # Visualization
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 # Modeling
 import torch
 import torch.nn as nn
