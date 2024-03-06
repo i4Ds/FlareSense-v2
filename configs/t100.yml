@@ -10,8 +10,8 @@ model:
   lr: 1.0e-4
 
 data:
-  normalization_mean: 0.5721
-  normalization_std: 0.1100
+  min_max_scale: True
+  standardize: False
   train_class_to_reduce: 0
   reduction_fraction: 0.2
   use_augmentation: False

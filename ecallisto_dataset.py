@@ -64,6 +64,7 @@ class EcallistoDataset(Dataset):
     def __init__(
         self,
         dataset,
+        antenna_stats,
         base_transform,
         normalization_transform,
         data_augm_transform=None,
@@ -71,6 +72,7 @@ class EcallistoDataset(Dataset):
     ):
         super().__init__()
         self.data = dataset
+        self.antenna_stats = antenna_stats
         self.data_augm_transform = data_augm_transform
         self.base_transform = base_transform
         self.normalization_transform = normalization_transform
@@ -136,7 +138,9 @@ class EcallistoDataset(Dataset):
             example["image"] = self.data_augm_transform(example["image"])
 
         # Normalization
-        example["image"] = self.normalization_transform(example["image"])
+        example["image"] = self.normalization_transform(
+            example["image"], example["antenna"]
+        )
 
         # Returns change if test
         if not self.return_all_columns:

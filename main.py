@@ -20,6 +20,23 @@ from ecallisto_dataset import (
     EcallistoDatasetBinary,
 )
 from ecallisto_model import EfficientNet
+from functools import partial
+
+
+def create_normalize_function(antenna_stats):
+    def normalize(image, antenna):
+        # Retrieve the statistics for the given antenna
+        stats = antenna_stats[antenna]
+        mean = stats["mean"]
+        std = stats["std"]
+
+        # Apply normalization (Assuming image is a torch.Tensor)
+        normalized_image = (image - mean) / std
+
+        return normalized_image
+
+    return normalize
+
 
 if __name__ == "__main__":
     print(f"PyTorch version {torch.__version__}")
@@ -57,11 +74,6 @@ if __name__ == "__main__":
     dd["test"] = ds["test"]
     dd["validation"] = ds["validation"]
 
-    # Define augmentation
-    normalize = Normalize(
-        mean=config["data"]["normalization_mean"],
-        std=config["data"]["normalization_std"],
-    )  # Calculated from the train dataset
     size = tuple(config["model"]["input_size"])
 
     # Transforms
@@ -80,16 +92,16 @@ if __name__ == "__main__":
     else:
         data_augm_transform = None
 
-    normalize_transform = Compose(
-        [
-            normalize,
-        ]
-    )
+    # Define normalization
+    with open("antenna_stats.yaml", "r") as file:
+        antenna_stats = yaml.safe_load(file)
+    normalize_transform = create_normalize_function(antenna_stats=antenna_stats)
 
     # Data Loader
     dataset = (
         EcallistoDatasetBinary if config["general"]["binary"] else EcallistoDataset
     )
+
     ds_train = dataset(
         dd["train"],
         base_transform=base_transform,
