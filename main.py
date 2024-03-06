@@ -1,18 +1,15 @@
-# Visualization
-import numpy as np
-
 # Modeling
 import torch
 from datasets import DatasetDict, load_dataset
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
-from sklearn.utils.class_weight import compute_class_weight
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+from torchaudio.transforms import FrequencyMasking, TimeMasking
 from torchvision.transforms import Compose, Normalize, Resize
 
 import wandb
-from ecallisto_dataset import EcallistoData
+from ecallisto_dataset import EcallistoData, randomly_reduce_class_samples
 from ecallisto_model import EfficientNet
 
 if __name__ == "__main__":
@@ -28,23 +25,67 @@ if __name__ == "__main__":
     # Mixed precision
     torch.set_float32_matmul_precision("high")
 
+    # Create dataset
     ds = load_dataset("i4ds/radio-sunburst-ecallisto")
 
     dd = DatasetDict()
-    dd["train"] = ds["train"]
+    dd["train"] = randomly_reduce_class_samples(ds["train"], 0, 0.2)
     dd["test"] = ds["test"]
     dd["validation"] = ds["validation"]
 
-    normalize = Normalize(mean=0.5721, std=0.1100)
+    # Define augmentation
+    normalize = Normalize(mean=0.5721, std=0.1100)  # Calculated from the train dataset
     size = (224, 244)
 
-    _transforms = Compose([Resize(size), normalize])
+    # Transforms
+    base_transform = Compose(
+        [
+            Resize(size),  # Resize the image
+        ]
+    )
+    data_augm_transform = Compose(
+        [
+            FrequencyMasking(freq_mask_param=30),  # Apply frequency masking
+            TimeMasking(time_mask_param=30),  # Apply time masking
+        ]
+    )
 
-    ds_train = EcallistoData(dd["train"], transform=_transforms)
-    ds_valid = EcallistoData(dd["validation"], transform=_transforms)
-    ds_test = EcallistoData(dd["test"], return_all_columns=True)
+    normalize_transform = Compose(
+        [
+            normalize,  # Normalize the image
+        ]
+    )
 
+    # Data Loader
+    ds_train = EcallistoData(
+        dd["train"],
+        binary_class=False,
+        base_transform=base_transform,
+        data_augm_transform=data_augm_transform,
+        normalization_transform=normalize_transform,
+    )
+    ds_valid = EcallistoData(
+        dd["validation"],
+        binary_class=False,
+        base_transform=base_transform,
+        normalization_transform=normalize_transform,
+    )
+    ds_test = EcallistoData(
+        dd["test"],
+        binary_class=False,
+        base_transform=base_transform,
+        normalization_transform=normalize_transform,
+        return_all_columns=True,
+    )
+
+    # Batch size
     BATCH_SIZE = 32
+
+    # Create Data loader
+    class_weights = ds_train.get_sample_weights()
+    sampler = WeightedRandomSampler(
+        class_weights, num_samples=len(class_weights), replacement=True
+    )
 
     train_dataloader = DataLoader(
         ds_train,
@@ -62,11 +103,7 @@ if __name__ == "__main__":
         persistent_workers=True,
     )
 
-    cw = compute_class_weight(
-        class_weight="balanced",
-        classes=np.unique(dd["train"]["label"]),
-        y=dd["train"]["label"],
-    )
+    cw = ds_train.get_class_weights()
 
     wandb.init(entity="vincenzo-timmel")
     wandb_logger = WandbLogger(log_model="all")
@@ -90,7 +127,7 @@ if __name__ == "__main__":
     )
 
     model = EfficientNet(
-        len(np.unique(dd["train"]["label"])), torch.tensor(cw, dtype=torch.float)
+        len(ds_train.get_labels()), torch.tensor(cw, dtype=torch.float)
     )
 
     trainer = Trainer(
