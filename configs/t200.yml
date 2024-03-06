@@ -2,8 +2,8 @@ general:
   batch_size: 32
   max_epochs: 10
   binary: True
-  use_random_sampler: False
-  use_class_weights: True
+  use_random_sampler: True
+  use_class_weights: False
 
 model:
   input_size: [224, 244]
@@ -14,6 +14,6 @@ data:
   normalization_std: 0.1100
   train_class_to_reduce: 0
   reduction_fraction: 0.2
-  use_augmentation: False
+  use_augmentation: True
   freq_mask_param: 30
   time_mask_param: 30
