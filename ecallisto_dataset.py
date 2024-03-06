@@ -64,7 +64,6 @@ class EcallistoDataset(Dataset):
     def __init__(
         self,
         dataset,
-        antenna_stats,
         base_transform,
         normalization_transform,
         data_augm_transform=None,
@@ -72,7 +71,6 @@ class EcallistoDataset(Dataset):
     ):
         super().__init__()
         self.data = dataset
-        self.antenna_stats = antenna_stats
         self.data_augm_transform = data_augm_transform
         self.base_transform = base_transform
         self.normalization_transform = normalization_transform
