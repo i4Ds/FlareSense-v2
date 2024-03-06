@@ -1,10 +1,11 @@
 # Modeling
+import numpy as np
 import torch
 from datasets import DatasetDict, load_dataset
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
-from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchaudio.transforms import FrequencyMasking, TimeMasking
 from torchvision.transforms import Compose, Normalize, Resize
 
@@ -59,20 +60,17 @@ if __name__ == "__main__":
     # Data Loader
     ds_train = EcallistoData(
         dd["train"],
-        binary_class=False,
         base_transform=base_transform,
         data_augm_transform=data_augm_transform,
         normalization_transform=normalize_transform,
     )
     ds_valid = EcallistoData(
         dd["validation"],
-        binary_class=False,
         base_transform=base_transform,
         normalization_transform=normalize_transform,
     )
     ds_test = EcallistoData(
         dd["test"],
-        binary_class=False,
         base_transform=base_transform,
         normalization_transform=normalize_transform,
         return_all_columns=True,
@@ -82,16 +80,17 @@ if __name__ == "__main__":
     BATCH_SIZE = 32
 
     # Create Data loader
-    class_weights = ds_train.get_sample_weights()
+    sample_weights = ds_train.get_sample_weights()
     sampler = WeightedRandomSampler(
-        class_weights, num_samples=len(class_weights), replacement=True
+        sample_weights, num_samples=len(sample_weights), replacement=True
     )
 
     train_dataloader = DataLoader(
         ds_train,
+        sampler=sampler,
         batch_size=BATCH_SIZE,
         num_workers=14,
-        shuffle=True,
+        shuffle=False,
         persistent_workers=True,
     )
 
@@ -102,8 +101,6 @@ if __name__ == "__main__":
         shuffle=False,
         persistent_workers=True,
     )
-
-    cw = ds_train.get_class_weights()
 
     wandb.init(entity="vincenzo-timmel")
     wandb_logger = WandbLogger(log_model="all")
@@ -126,17 +123,21 @@ if __name__ == "__main__":
         mode="max",
     )
 
+    # Setup Model
     model = EfficientNet(
-        len(ds_train.get_labels()), torch.tensor(cw, dtype=torch.float)
+        len(np.unique(ds_train.get_labels())),
+        class_weights=None,  # ds_train.get_class_weights(),
     )
 
+    # Trainer
     trainer = Trainer(
         accelerator="gpu",
-        max_epochs=5,
+        max_epochs=30,
         logger=wandb_logger,
         callbacks=[checkpoint_callback_loss, checkpoint_callback_f1],
         val_check_interval=200,
     )
+    # Train
     trainer.fit(
         model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader
     )

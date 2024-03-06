@@ -135,7 +135,6 @@ class EcallistoData(Dataset):
             and random.random() < augmentation_prob
         ):
             example["image"] = self.data_augm_transform(example["image"])
-        else:
 
         # Normalization
         example["image"] = self.normalization_transform(example["image"])
