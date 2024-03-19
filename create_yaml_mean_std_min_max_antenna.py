@@ -21,12 +21,12 @@ ds = load_dataset("i4ds/radio-sunburst-ecallisto")
 
 
 for entry in tqdm(ds["train"], desc="Processing dataset"):
-    x = pil_to_tensor(entry["image"])
+    x = pil_to_tensor(entry["image"]).float()
     antenna = entry["antenna"]
 
     # Update count, mean, and M2
     n = x.numel()
-    new_mean = torch.mean(x.float()).item()
+    new_mean = torch.mean(x).item()
     new_variance = torch.var(
         x, unbiased=False
     ).item()  # Use unbiased=False for a population variance

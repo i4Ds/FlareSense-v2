@@ -8,5 +8,5 @@
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 
-python3 create_yaml_mean_std_min_max_antenna.py
-# srun python3 main.py --config configs/t100.yml
+# python3 create_yaml_mean_std_min_max_antenna.py
+srun python3 main.py --config configs/t100.yml
