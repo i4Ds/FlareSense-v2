@@ -85,7 +85,7 @@ class EcallistoDataset(Dataset):
         return example
 
     @staticmethod
-    def scale(img, max_value=255):
+    def scale(img, max_value=254):
         img = torch.div(img, max_value)
         return img
 

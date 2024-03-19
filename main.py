@@ -11,7 +11,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchaudio.transforms import FrequencyMasking, TimeMasking
-from torchvision.transforms import Compose, Normalize, Resize
+from torchvision.transforms import Compose, Resize
 
 import wandb
 from ecallisto_dataset import (
@@ -20,7 +20,6 @@ from ecallisto_dataset import (
     EcallistoDatasetBinary,
 )
 from ecallisto_model import EfficientNet
-from functools import partial
 
 
 def create_normalize_function(antenna_stats):
@@ -135,7 +134,7 @@ if __name__ == "__main__":
         ds_train,
         sampler=sampler,
         batch_size=config["general"]["batch_size"],
-        num_workers=14,
+        num_workers=8,
         shuffle=False if sampler is not None else True,
         persistent_workers=True,
     )
@@ -143,7 +142,7 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(
         ds_valid,
         batch_size=config["general"]["batch_size"],
-        num_workers=14,
+        num_workers=8,
         shuffle=False,
         persistent_workers=True,
     )
@@ -185,7 +184,17 @@ if __name__ == "__main__":
         callbacks=[checkpoint_callback_loss, checkpoint_callback_f1],
         val_check_interval=200,
     )
+
     # Train
     trainer.fit(
         model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader
+    )
+
+    # Evaluate on Test set
+    test_dataloader = DataLoader(
+        ds_test,
+        batch_size=config["general"]["batch_size"],
+        num_workers=8,
+        shuffle=False,
+        persistent_workers=True,
     )
