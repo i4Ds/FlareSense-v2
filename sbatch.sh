@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --time=06:00:00
+#SBATCH --time=05:00:00
 #SBATCH --ntasks-per-node=1
 #SBATCH --job-name flaresense-v2
 #SBATCH --mem=32G

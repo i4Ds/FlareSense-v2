@@ -26,11 +26,10 @@ def create_normalize_function(antenna_stats):
     def normalize(image, antenna):
         # Retrieve the statistics for the given antenna
         stats = antenna_stats[antenna]
-        mean = stats["mean"]
-        std = stats["std"]
 
         # Apply normalization (Assuming image is a torch.Tensor)
-        normalized_image = (image - mean) / std
+        normalized_image = (image - stats["min"]) / (stats["max"] - stats["min"])
+        normalized_image = (normalized_image - stats["mean"]) / stats["std"]
 
         return normalized_image
 
@@ -198,3 +197,5 @@ if __name__ == "__main__":
         shuffle=False,
         persistent_workers=True,
     )
+
+    trainer.test(model, dataloaders=test_dataloader)

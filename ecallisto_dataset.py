@@ -80,7 +80,7 @@ class EcallistoDataset(Dataset):
     @staticmethod
     def to_torch_tensor(example):
         # Convert the example to a torch tensor.
-        example["image"] = pil_to_tensor(example["image"])
+        example["image"] = pil_to_tensor(example["image"]).float()
         example["label"] = torch.tensor(example["label"])
         return example
 
@@ -117,7 +117,6 @@ class EcallistoDataset(Dataset):
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
         example = self.to_torch_tensor(self.data[index])
-        example["image"] = self.scale(example["image"])
 
         # Base augmentation
         example["image"] = self.base_transform(example["image"])

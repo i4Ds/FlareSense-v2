@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from pytorch_lightning import LightningModule
 from torchmetrics import Accuracy, ConfusionMatrix, F1Score
 from torchvision import models
-
+from collections import defaultdict
 import wandb
 
 
@@ -24,6 +24,11 @@ class EcallistoBase(LightningModule):
         )
         self.confmat = ConfusionMatrix(task="multiclass", num_classes=n_classes)
         self.class_weights = class_weights
+
+        ## Test parameters
+        self.fp_examples = []
+        self.fn_examples = []
+        self.results = defaultdict(lambda: {"correct": 0, "total": 0})
 
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -67,6 +72,33 @@ class EcallistoBase(LightningModule):
 
         # Reset the confusion matrix for the next epoch
         self.confmat.reset()
+
+    def test_step(self, batch, batch_idx):
+        images, labels, antennas, types = batch
+        outputs = self(images)
+        _, preds = torch.max(outputs, dim=1)
+
+        # Record accuracy
+        for label, pred, antenna, typ in zip(labels, preds, antennas, types):
+            key = (antenna, typ)
+            self.results[key]["total"] += 1
+            if label == pred:
+                self.results[key]["correct"] += 1
+            else:
+                # Handle false positives/negatives
+                if label == 0:  # Assuming 0 is the negative class
+                    if len(self.fp_examples) < 15:
+                        self.fp_examples.append((images, antenna, typ))
+                else:
+                    if len(self.fn_examples) < 15:
+                        self.fn_examples.append((images, antenna, typ))
+
+    def test_epoch_end(self, outputs):
+        # Here, calculate and log your desired metrics.
+        # For example, log accuracy per antenna/type and save false examples.
+        for key, result in self.results.items():
+            accuracy = result["correct"] / result["total"] * 100
+            print(f"Antenna: {key[0]}, Type: {key[1]}, Accuracy: {accuracy}%")
 
 
 class EfficientNet(EcallistoBase):

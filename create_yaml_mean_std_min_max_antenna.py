@@ -20,9 +20,29 @@ antenna_stats = defaultdict(
 ds = load_dataset("i4ds/radio-sunburst-ecallisto")
 
 
-for entry in tqdm(ds["train"], desc="Processing dataset"):
+for entry in tqdm(ds["train"], desc="Processing dataset for min max"):
     x = pil_to_tensor(entry["image"]).float()
     antenna = entry["antenna"]
+
+    # Retrieve current stats for the antenna
+    cur_stats = antenna_stats[antenna]
+
+    # Update min and max
+    cur_stats["min"] = min(cur_stats["min"], torch.min(x).item())
+    cur_stats["max"] = max(cur_stats["max"], torch.max(x).item())
+
+    # Update the dictionary
+    antenna_stats[antenna] = cur_stats
+
+
+for entry in tqdm(ds["train"], desc="Processing dataset for min max"):
+    x = pil_to_tensor(entry["image"]).float()
+    antenna = entry["antenna"]
+    cur_stats = antenna_stats[antenna]
+
+    min_, max_ = cur_stats["min"], cur_stats["max"]
+
+    x = (x - min_) / (max_ - min_)
 
     # Update count, mean, and M2
     n = x.numel()
@@ -32,18 +52,12 @@ for entry in tqdm(ds["train"], desc="Processing dataset"):
     ).item()  # Use unbiased=False for a population variance
     new_count = n
 
-    # Retrieve current stats for the antenna
-    cur_stats = antenna_stats[antenna]
     delta = new_mean - cur_stats["mean"]
     cur_stats["mean"] += delta * new_count / (cur_stats["n_elements"] + new_count)
     cur_stats["M2"] += new_variance * new_count + delta**2 * cur_stats[
         "n_elements"
     ] * new_count / (cur_stats["n_elements"] + new_count)
     cur_stats["n_elements"] += new_count
-
-    # Update min and max
-    cur_stats["min"] = min(cur_stats["min"], torch.min(x).item())
-    cur_stats["max"] = max(cur_stats["max"], torch.max(x).item())
 
     # Update the dictionary
     antenna_stats[antenna] = cur_stats
