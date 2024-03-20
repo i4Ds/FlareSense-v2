@@ -3,7 +3,7 @@ program: main.py
 method: bayes
 project: FlareSense-v2
 metric:
-  name: test_rafp
+  name: test_f1
   goal: maximize
 parameters:
   model:
