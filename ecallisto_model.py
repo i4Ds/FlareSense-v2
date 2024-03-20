@@ -11,10 +11,11 @@ from torchmetrics import Accuracy, ConfusionMatrix, F1Score, Recall, Precision
 from torchvision import models
 from collections import defaultdict
 import wandb
+from torchvision.transforms.functional import to_pil_image
 
 
 class EcallistoBase(LightningModule):
-    def __init__(self, n_classes, class_weights):
+    def __init__(self, n_classes, class_weights, unnormalize_img):
         super().__init__()
         self.recall = Recall(task="multiclass", num_classes=n_classes)
         self.precision = Precision(task="multiclass", num_classes=n_classes)
@@ -28,9 +29,10 @@ class EcallistoBase(LightningModule):
         self.fp_examples = []
         self.fn_examples = []
         self.results = defaultdict(lambda: {"correct": 0, "total": 0})
+        self.unnormalize_img = unnormalize_img
 
     def training_step(self, batch, batch_idx):
-        x, y, _ = batch
+        x, y, _, _ = batch
         y_hat = self(x)
         if self.class_weights is not None:
             loss = F.cross_entropy(y_hat, y, weight=self.class_weights.to(y.device))
@@ -43,7 +45,7 @@ class EcallistoBase(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y, _ = batch
+        x, y, _, _ = batch
         y_hat = self(x)
         loss = F.cross_entropy(y_hat, y)
         preds = torch.argmax(y_hat, dim=1)
@@ -75,11 +77,11 @@ class EcallistoBase(LightningModule):
         self.confmat.reset()
 
     def test_step(self, batch, batch_idx):
-        images, labels, antennas = batch
+        images, labels, antennas, types = batch
         outputs = self(images)
         _, preds = torch.max(outputs, dim=1)
 
-        for label, pred, antenna, typ in zip(labels, preds, antennas):
+        for label, pred, antenna, typ in zip(labels, preds, antennas, types):
             key = (antenna, typ)
 
             if label == pred:
@@ -159,6 +161,26 @@ class EcallistoBase(LightningModule):
             }
         )
 
+        # Upload images
+        fp_images = [
+            wandb.Image(
+                to_pil_image(self.unnormalize_img(img[0], img[1])),
+                caption=f"Antenna: {img[1]}. Type: {img[2]}",
+            )
+            for img in self.fp_examples
+        ]
+        wandb.log({"False Positives": fp_images})
+
+        # Convert and log false negative examples
+        fn_images = [
+            wandb.Image(
+                to_pil_image(self.unnormalize_img(img[0], img[1])),
+                caption=f"Antenna: {img[1]}. Type: {img[2]}",
+            )
+            for img in self.fn_examples
+        ]
+        wandb.log({"False Negatives": fn_images})
+
 
 class EfficientNet(EcallistoBase):
     def __init__(self, n_classes, class_weights, learnig_rate, model_weights=None):
@@ -216,3 +238,19 @@ def create_normalize_function(antenna_stats):
         return normalized_image
 
     return normalize
+
+
+def create_unnormalize_function(antenna_stats):
+    def unnormalize(normalized_image, antenna):
+        # Retrieve the statistics for the given antenna
+        stats = antenna_stats[antenna]
+
+        # Reverse the normalization
+        unnormalized_image = normalized_image * stats["std"] + stats["mean"]
+        unnormalized_image = (
+            unnormalized_image * (stats["max"] - stats["min"]) + stats["min"]
+        )
+
+        return unnormalized_image
+
+    return unnormalize

@@ -19,7 +19,11 @@ from ecallisto_dataset import (
     randomly_reduce_class_samples,
     EcallistoDatasetBinary,
 )
-from ecallisto_model import EfficientNet, create_normalize_function
+from ecallisto_model import (
+    EfficientNet,
+    create_normalize_function,
+    create_unnormalize_function,
+)
 
 
 if __name__ == "__main__":
@@ -154,10 +158,12 @@ if __name__ == "__main__":
 
     # Setup Model
     cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
+    unnormalize_img = create_unnormalize_function(antenna_stats)
     model = EfficientNet(
         n_classes=len(np.unique(ds_train.get_labels())),
         class_weights=cw if config["general"]["use_class_weights"] else None,
         learnig_rate=config["model"]["lr"],
+        unnormalize_img=unnormalize_img,
     )
 
     # Trainer

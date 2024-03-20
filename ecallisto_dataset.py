@@ -18,12 +18,6 @@ def scale(example, max_value=255):
     return example
 
 
-def preprocess(example):
-    example = to_torch_tensor(example)
-    example = scale(example)
-    return example
-
-
 def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):
     """
     Randomly reduce the number of samples for a specific class in a dataset.
@@ -134,7 +128,7 @@ class EcallistoDataset(Dataset):
         )
 
         # Returns all
-        return example["image"], example["label"], example["antenna"]
+        return example["image"], example["label"], example["antenna"], example["type"]
 
 
 class EcallistoDatasetBinary(EcallistoDataset):
@@ -155,12 +149,12 @@ class EcallistoDatasetBinary(EcallistoDataset):
 
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
-        image, label, antenna = super().__getitem__(index)
+        image, label, antenna, type = super().__getitem__(index)
 
         # Convert label to binary
         label = 0 if label.item() == 0 else 1
 
-        return image, torch.tensor(label), antenna
+        return image, torch.tensor(label), antenna, type
 
     def get_labels(self):
         # Return binary labels: 0 if the label is 0, 1 otherwise
