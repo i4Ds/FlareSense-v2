@@ -15,7 +15,6 @@ from torchvision.transforms import Compose, Resize
 
 import wandb
 from ecallisto_dataset import (
-    EcallistoDataset,
     randomly_reduce_class_samples,
     EcallistoDatasetBinary,
 )
@@ -58,15 +57,21 @@ if __name__ == "__main__":
     del config
     config = wandb.config
 
+    # Print the full config
+    print(dict(config))
+
     # Create dataset
     ds = load_dataset("i4ds/radio-sunburst-ecallisto")
 
     dd = DatasetDict()
-    dd["train"] = randomly_reduce_class_samples(
-        ds["train"],
-        config["data"]["train_class_to_reduce"],
-        config["data"]["reduction_fraction"],
-    )
+    if config["data"]["reduce_non_burst"]:
+        dd["train"] = randomly_reduce_class_samples(
+            ds["train"],
+            config["data"]["train_class_to_reduce"],
+            config["data"]["reduction_fraction"],
+        )
+    else:
+        dd["train"] = ds["train"]
     dd["test"] = ds["test"]
     dd["validation"] = ds["validation"]
 
@@ -91,7 +96,9 @@ if __name__ == "__main__":
     # Define normalization
     with open("antenna_stats.yaml", "r") as file:
         antenna_stats = yaml.safe_load(file)
-    normalize_transform = create_normalize_function(antenna_stats=antenna_stats)
+    normalize_transform = create_normalize_function(
+        antenna_stats=antenna_stats, simple=config["data"]["simple_normalization"]
+    )
 
     # Data Loader
     ds_train = EcallistoDatasetBinary(
@@ -136,9 +143,9 @@ if __name__ == "__main__":
 
     # Checkpoint to save the best model based on the lowest validation loss
     checkpoint_callback_rafp = ModelCheckpoint(
-        monitor="val_rafp",
+        monitor="val_loss",
         dirpath=wandb_logger.experiment.dir,
-        filename="efficientnet-rafp-{epoch:02d}-{step:05d}-{val_loss:.2f}",
+        filename="efficientnet-loss-{epoch:02d}-{step:05d}-{val_loss:.2f}",
         save_top_k=1,
         mode="min",
     )
@@ -160,6 +167,7 @@ if __name__ == "__main__":
         accelerator="gpu",
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
+        enable_progress_bar=False,
         callbacks=[
             checkpoint_callback_rafp,
             EarlyStopping(monitor="val_loss", mode="min", patience=20),

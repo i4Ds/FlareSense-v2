@@ -16,6 +16,10 @@ parameters:
     parameters:
       use_augmentation:
         values: [True, False]
+      simple_normalization:
+        values: [True, False]
+      reduce_non_burst:
+        values: [True, False]
 
 
 command:

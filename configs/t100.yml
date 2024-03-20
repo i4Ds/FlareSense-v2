@@ -12,8 +12,10 @@ model:
   dropout: 0.2
 
 data:
+  reduce_non_burst: True
   train_class_to_reduce: 0
   reduction_fraction: 0.2
+  simple_normalization: False
   use_augmentation: False
   freq_mask_param: 30
   time_mask_param: 30

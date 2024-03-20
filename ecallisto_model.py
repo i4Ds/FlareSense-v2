@@ -26,9 +26,6 @@ class EcallistoBase(LightningModule):
         self.task = "binary" if n_classes == 1 else "multiclass"
         self.recall = Recall(task=self.task, num_classes=n_classes)
         self.precision = Precision(task=self.task, num_classes=n_classes)
-        self.rafp = RecallAtFixedPrecision(
-            task=self.task, num_classes=n_classes, min_precision=min_precision
-        )
         self.f1_score = F1Score(task=self.task, num_classes=n_classes, average="macro")
         self.confmat = ConfusionMatrix(task=self.task, num_classes=n_classes)
         self.class_weights = class_weights
@@ -40,9 +37,10 @@ class EcallistoBase(LightningModule):
         self.results = defaultdict(lambda: {"TP": 0, "TN": 0, "FP": 0, "FN": 0})
         self.unnormalize_img = unnormalize_img
 
+    @staticmethod
     def _calculate_prediction(y_hat):
-        probabilities = F.softmax(y_hat, dim=1).squeeze()[:, 1]
-        preds = torch.where(probabilities > 0.5, 1, 0).squeeze()
+        probabilities = F.softmax(y_hat, dim=1).squeeze()
+        preds = torch.where(probabilities[:, 1] > 0.5, 1, 0)
         return probabilities, preds
 
     def training_step(self, batch, batch_idx):
@@ -70,27 +68,23 @@ class EcallistoBase(LightningModule):
             prog_bar=True,
             sync_dist=True,
         )
-        probabilities, preds = self._calculate_prediction(y_hat)
+        _, preds = self._calculate_prediction(y_hat)
         # Update confusion matrix and other metrics
         self.confmat.update(preds, y)
         self.precision.update(preds, y)
         self.recall.update(preds, y)
         self.f1_score.update(preds, y)
-        self.rafp.update(probabilities, y)
 
     def on_validation_epoch_end(self):
         # Calculate and log metrics
         pre = self.precision.compute()
         rec = self.recall.compute()
         f1 = self.f1_score.compute()
-        rafp = self.rafp.compute()
 
         # Log the computed metrics
         self.log("val_precision", pre, prog_bar=True)
         self.log("val_recall", rec, prog_bar=True)
         self.log("val_f1", f1, prog_bar=True)
-        self.log("val_rafp", rafp[0], prog_bar=True)
-        self.log("val_rafp_thres", rafp[1], prog_bar=True)
 
         # Calculate conf matrix
         confmat = self.confmat.compute()
@@ -110,13 +104,12 @@ class EcallistoBase(LightningModule):
         self.precision.reset()
         self.recall.reset()
         self.f1_score.reset()
-        self.rafp.reset()
         self.confmat.reset()
 
     def test_step(self, batch, batch_idx):
         images, labels, antennas = batch
         y_hat = self(images)
-        probabilities, preds = self._calculate_prediction(y_hat)
+        _, preds = self._calculate_prediction(y_hat)
 
         for img, label, pred, antenna in zip(images, labels, preds, antennas):
             key = (antenna, label)
@@ -132,28 +125,23 @@ class EcallistoBase(LightningModule):
 
         # Calculate metrics
         y_hat = self(images)
-        probabilities = F.sigmoid(y_hat, dim=1)
 
         # Update confusion matrix and other metrics
         self.confmat.update(preds, labels)
         self.precision.update(preds, labels)
         self.recall.update(preds, labels)
         self.f1_score.update(preds, labels)
-        self.rafp.update(probabilities, labels)
 
     def on_test_epoch_end(self):
         # Calculate and log metrics
         pre = self.precision.compute()
         rec = self.recall.compute()
         f1 = self.f1_score.compute()
-        rafp = self.rafp.compute()
 
         # Log the computed metrics
         self.log("test_precision", pre, prog_bar=True)
         self.log("test_recall", rec, prog_bar=True)
         self.log("test_f1", f1, prog_bar=True)
-        self.log("test_rafp", rafp[0], prog_bar=True)
-        self.log("test_rafp_thres", rafp[1], prog_bar=True)
 
         # Calculate conf matrix
         confmat = self.confmat.compute()
@@ -173,7 +161,6 @@ class EcallistoBase(LightningModule):
         self.precision.reset()
         self.recall.reset()
         self.f1_score.reset()
-        self.rafp.reset()
         self.confmat.reset()
         # Upload images
         fp_images = [
@@ -259,7 +246,7 @@ class ResNet18(EcallistoBase):
         return torch.optim.Adam(self.parameters(), lr=self.learnig_rate)
 
 
-def create_normalize_function(antenna_stats):
+def create_normalize_function(antenna_stats, simple):
     def normalize(image, antenna):
         # Retrieve the statistics for the given antenna
         stats = antenna_stats[antenna]
@@ -270,7 +257,10 @@ def create_normalize_function(antenna_stats):
 
         return normalized_image
 
-    return normalize
+    def simple_normalize(image, antenna):
+        return image / 255.0
+
+    return simple_normalize if simple else normalize
 
 
 def create_unnormalize_function(antenna_stats):
