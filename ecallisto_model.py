@@ -63,7 +63,7 @@ class EcallistoBase(LightningModule):
         self.log(
             "val_loss",
             loss,
-            on_step=False,
+            on_step=True,
             on_epoch=False,
             prog_bar=True,
             sync_dist=True,
