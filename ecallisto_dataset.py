@@ -62,19 +62,13 @@ def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):
 # Dataset
 class EcallistoDataset(Dataset):
     def __init__(
-        self,
-        dataset,
-        base_transform,
-        normalization_transform,
-        data_augm_transform=None,
-        return_all_columns=False,
+        self, dataset, base_transform, normalization_transform, data_augm_transform=None
     ):
         super().__init__()
         self.data = dataset
         self.data_augm_transform = data_augm_transform
         self.base_transform = base_transform
         self.normalization_transform = normalization_transform
-        self.return_all_columns = return_all_columns
         self.dataset_label_weight = self.get_dataset_label_weight()
 
     @staticmethod
@@ -139,11 +133,8 @@ class EcallistoDataset(Dataset):
             example["image"], example["antenna"]
         )
 
-        # Returns change if test
-        if not self.return_all_columns:
-            return example["image"], example["label"]
-        else:
-            return self.data[index]
+        # Returns all
+        return example["image"], example["label"], example["antenna"]
 
 
 class EcallistoDatasetBinary(EcallistoDataset):
@@ -153,7 +144,6 @@ class EcallistoDatasetBinary(EcallistoDataset):
         base_transform,
         normalization_transform,
         data_augm_transform=None,
-        return_all_columns=False,
     ):
         # Initialize the parent class
         super().__init__(
@@ -161,22 +151,16 @@ class EcallistoDatasetBinary(EcallistoDataset):
             base_transform,
             normalization_transform,
             data_augm_transform=data_augm_transform,
-            return_all_columns=return_all_columns,
         )
 
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
-        example = super().__getitem__(index)
+        image, label, antenna = super().__getitem__(index)
 
         # Convert label to binary
-        label = 0 if example[1].item() == 0 else 1
-        image = example[0]
+        label = 0 if label.item() == 0 else 1
 
-        if not self.return_all_columns:
-            return image, torch.tensor(label)
-        else:
-            example["label"] = torch.tensor(label)
-            return example
+        return image, torch.tensor(label), antenna
 
     def get_labels(self):
         # Return binary labels: 0 if the label is 0, 1 otherwise

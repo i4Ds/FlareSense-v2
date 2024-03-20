@@ -1,0 +1,15 @@
+#https://docs.wandb.ai/guides/sweeps/quickstart
+program: main.py
+method: bayes
+project: FlareSense-v2
+metric:
+  name: val_f1
+  goal: maximize
+parameters:
+
+
+command:
+  - ${interpreter}
+  - ${program}
+  - "--config_name"
+  - "sweep" #Insert your model here (do not push it, adapt it each time.)

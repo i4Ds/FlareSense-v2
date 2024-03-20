@@ -7,7 +7,7 @@ import torch
 import yaml
 from datasets import DatasetDict, load_dataset
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchaudio.transforms import FrequencyMasking, TimeMasking
@@ -19,21 +19,7 @@ from ecallisto_dataset import (
     randomly_reduce_class_samples,
     EcallistoDatasetBinary,
 )
-from ecallisto_model import EfficientNet
-
-
-def create_normalize_function(antenna_stats):
-    def normalize(image, antenna):
-        # Retrieve the statistics for the given antenna
-        stats = antenna_stats[antenna]
-
-        # Apply normalization (Assuming image is a torch.Tensor)
-        normalized_image = (image - stats["min"]) / (stats["max"] - stats["min"])
-        normalized_image = (normalized_image - stats["mean"]) / stats["std"]
-
-        return normalized_image
-
-    return normalize
+from ecallisto_model import EfficientNet, create_normalize_function
 
 
 if __name__ == "__main__":
@@ -59,6 +45,14 @@ if __name__ == "__main__":
     # Load the configuration file
     with open(args.config, "r") as file:
         config = yaml.safe_load(file)
+
+    # Setup wandb
+    wandb.init(entity="vincenzo-timmel", config=config)
+    wandb_logger = WandbLogger(log_model="all")
+
+    # Overwrite config with wandb config (for sweep etc.)
+    del config
+    config = wandb.config
 
     # Create dataset
     ds = load_dataset("i4ds/radio-sunburst-ecallisto")
@@ -111,12 +105,6 @@ if __name__ == "__main__":
         base_transform=base_transform,
         normalization_transform=normalize_transform,
     )
-    ds_test = dataset(
-        dd["test"],
-        base_transform=base_transform,
-        normalization_transform=normalize_transform,
-        return_all_columns=True,
-    )
 
     # Create Data loader
     sample_weights = (
@@ -145,9 +133,6 @@ if __name__ == "__main__":
         shuffle=False,
         persistent_workers=True,
     )
-
-    wandb.init(entity="vincenzo-timmel", config=config)
-    wandb_logger = WandbLogger(log_model="all")
 
     # Checkpoint to save the best model based on the lowest validation loss
     checkpoint_callback_loss = ModelCheckpoint(
@@ -180,7 +165,11 @@ if __name__ == "__main__":
         accelerator="gpu",
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
-        callbacks=[checkpoint_callback_loss, checkpoint_callback_f1],
+        callbacks=[
+            checkpoint_callback_loss,
+            checkpoint_callback_f1,
+            EarlyStopping(monitor="val_loss", mode="min", patience=20),
+        ],
         val_check_interval=200,
     )
 
@@ -189,13 +178,17 @@ if __name__ == "__main__":
         model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader
     )
 
-    # Evaluate on Test set
+    ## Evaluate
+    ds_valid = dataset(
+        dd["test"],
+        base_transform=base_transform,
+        normalization_transform=normalize_transform,
+    )
     test_dataloader = DataLoader(
-        ds_test,
+        ds_valid,
         batch_size=config["general"]["batch_size"],
         num_workers=8,
         shuffle=False,
-        persistent_workers=True,
+        persistent_workers=False,
     )
-
-    trainer.test(model, dataloaders=test_dataloader)
+    trainer.test(model, test_dataloader, ckpt_path="best")

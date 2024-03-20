@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning import LightningModule
-from torchmetrics import Accuracy, ConfusionMatrix, F1Score
+from torchmetrics import Accuracy, ConfusionMatrix, F1Score, Recall, Precision
 from torchvision import models
 from collections import defaultdict
 import wandb
@@ -16,9 +16,8 @@ import wandb
 class EcallistoBase(LightningModule):
     def __init__(self, n_classes, class_weights):
         super().__init__()
-        self.accuracy = Accuracy(
-            task="multiclass", num_classes=n_classes, average="macro"
-        )
+        self.recall = Recall(task="multiclass", num_classes=n_classes)
+        self.precision = Precision(task="multiclass", num_classes=n_classes)
         self.f1_score = F1Score(
             task="multiclass", num_classes=n_classes, average="macro"
         )
@@ -31,7 +30,7 @@ class EcallistoBase(LightningModule):
         self.results = defaultdict(lambda: {"correct": 0, "total": 0})
 
     def training_step(self, batch, batch_idx):
-        x, y = batch
+        x, y, _ = batch
         y_hat = self(x)
         if self.class_weights is not None:
             loss = F.cross_entropy(y_hat, y, weight=self.class_weights.to(y.device))
@@ -44,14 +43,16 @@ class EcallistoBase(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch
+        x, y, _ = batch
         y_hat = self(x)
         loss = F.cross_entropy(y_hat, y)
         preds = torch.argmax(y_hat, dim=1)
         self.confmat.update(preds, y)
-        acc = self.accuracy(y_hat, y)
+        pre = self.precision(y_hat, y)
+        rec = self.recall(y_hat, y)
         f1 = self.f1_score(y_hat, y)
-        self.log("val_acc", acc, prog_bar=True, logger=True)
+        self.log("val_precision", pre, prog_bar=True, logger=True)
+        self.log("val_recall", rec, prog_bar=True, logger=True)
         self.log("val_f1", f1, prog_bar=True, logger=True)
         self.log("val_loss", loss, prog_bar=True, logger=True)
 
@@ -74,31 +75,89 @@ class EcallistoBase(LightningModule):
         self.confmat.reset()
 
     def test_step(self, batch, batch_idx):
-        images, labels, antennas, types = batch
+        images, labels, antennas = batch
         outputs = self(images)
         _, preds = torch.max(outputs, dim=1)
 
-        # Record accuracy
-        for label, pred, antenna, typ in zip(labels, preds, antennas, types):
+        for label, pred, antenna, typ in zip(labels, preds, antennas):
             key = (antenna, typ)
-            self.results[key]["total"] += 1
+
             if label == pred:
-                self.results[key]["correct"] += 1
+                if label == 1:  # Assuming 1 is the positive class
+                    self.results[key]["TP"] += 1
+                else:
+                    self.results[key]["TN"] += 1
             else:
-                # Handle false positives/negatives
                 if label == 0:  # Assuming 0 is the negative class
+                    self.results[key]["FP"] += 1
                     if len(self.fp_examples) < 15:
                         self.fp_examples.append((images, antenna, typ))
                 else:
+                    self.results[key]["FN"] += 1
                     if len(self.fn_examples) < 15:
                         self.fn_examples.append((images, antenna, typ))
 
-    def test_epoch_end(self, outputs):
-        # Here, calculate and log your desired metrics.
-        # For example, log accuracy per antenna/type and save false examples.
+    def on_test_epoch_end(self, outputs):
+        # Initialize a wandb Table
+        metrics_table = wandb.Table(
+            columns=["Antenna", "Type", "Precision", "Recall", "F1"]
+        )
+
+        overall_metrics = {"TP": 0, "FP": 0, "FN": 0, "TN": 0}
         for key, result in self.results.items():
-            accuracy = result["correct"] / result["total"] * 100
-            print(f"Antenna: {key[0]}, Type: {key[1]}, Accuracy: {accuracy}%")
+            precision = (
+                result["TP"] / (result["TP"] + result["FP"])
+                if (result["TP"] + result["FP"]) > 0
+                else 0
+            )
+            recall = (
+                result["TP"] / (result["TP"] + result["FN"])
+                if (result["TP"] + result["FN"]) > 0
+                else 0
+            )
+            f1 = (
+                2 * (precision * recall) / (precision + recall)
+                if (precision + recall) > 0
+                else 0
+            )
+
+            # Add data to the table
+            metrics_table.add_data(key[0], key[1], precision, recall, f1)
+
+            # Update overall metrics
+            for metric in overall_metrics.keys():
+                overall_metrics[metric] += result[metric]
+
+        # Calculate overall metrics
+        overall_precision = (
+            overall_metrics["TP"] / (overall_metrics["TP"] + overall_metrics["FP"])
+            if (overall_metrics["TP"] + overall_metrics["FP"]) > 0
+            else 0
+        )
+        overall_recall = (
+            overall_metrics["TP"] / (overall_metrics["TP"] + overall_metrics["FN"])
+            if (overall_metrics["TP"] + overall_metrics["FN"]) > 0
+            else 0
+        )
+        overall_f1 = (
+            2
+            * (overall_precision * overall_recall)
+            / (overall_precision + overall_recall)
+            if (overall_precision + overall_recall) > 0
+            else 0
+        )
+
+        # Log the table to wandb
+        wandb.log({"Metrics by Antenna/Type": metrics_table})
+
+        # Optionally, log overall metrics as a separate entry or include them in the table as well
+        wandb.log(
+            {
+                "Overall Precision": overall_precision,
+                "Overall Recall": overall_recall,
+                "Overall F1": overall_f1,
+            }
+        )
 
 
 class EfficientNet(EcallistoBase):
@@ -143,3 +202,17 @@ class ResNet18(EcallistoBase):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-4)
+
+
+def create_normalize_function(antenna_stats):
+    def normalize(image, antenna):
+        # Retrieve the statistics for the given antenna
+        stats = antenna_stats[antenna]
+
+        # Apply normalization (Assuming image is a torch.Tensor)
+        normalized_image = (image - stats["min"]) / (stats["max"] - stats["min"])
+        normalized_image = (normalized_image - stats["mean"]) / stats["std"]
+
+        return normalized_image
+
+    return normalize
