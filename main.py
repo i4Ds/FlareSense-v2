@@ -94,17 +94,13 @@ if __name__ == "__main__":
     normalize_transform = create_normalize_function(antenna_stats=antenna_stats)
 
     # Data Loader
-    dataset = (
-        EcallistoDatasetBinary if config["general"]["binary"] else EcallistoDataset
-    )
-
-    ds_train = dataset(
+    ds_train = EcallistoDatasetBinary(
         dd["train"],
         base_transform=base_transform,
         data_augm_transform=data_augm_transform,
         normalization_transform=normalize_transform,
     )
-    ds_valid = dataset(
+    ds_valid = EcallistoDatasetBinary(
         dd["validation"],
         base_transform=base_transform,
         normalization_transform=normalize_transform,
@@ -151,8 +147,8 @@ if __name__ == "__main__":
     cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
     unnormalize_img = create_unnormalize_function(antenna_stats)
     model = EfficientNet(
-        n_classes=len(np.unique(ds_train.get_labels())),
-        class_weights=cw if config["general"]["use_class_weights"] else None,
+        n_classes=2,  # Binary
+        class_weights=(cw if config["general"]["use_class_weights"] else None),
         dropout=config["model"]["dropout"],
         learnig_rate=config["model"]["lr"],
         min_precision=config["general"]["min_precision"],
@@ -177,7 +173,7 @@ if __name__ == "__main__":
     )
 
     ## Evaluate
-    ds_test = dataset(
+    ds_test = EcallistoDatasetBinary(
         dd["test"],
         base_transform=base_transform,
         normalization_transform=normalize_transform,

@@ -7,52 +7,6 @@ from torch.utils.data import Dataset
 from torchvision.transforms.functional import pil_to_tensor
 
 
-def to_torch_tensor(example):
-    # Convert the PIL image to a tensor
-    example["image"] = pil_to_tensor(example["image"])
-    return example
-
-
-def scale(example, max_value=255):
-    example["image"] = torch.div(example["image"], max_value)
-    return example
-
-
-def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):
-    """
-    Randomly reduce the number of samples for a specific class in a dataset.
-
-    :param dataset: The dataset to process (assumed to be a Hugging Face dataset).
-    :param target_class: The class label of the class to reduce.
-    :param fraction_to_keep: Fraction of the target class samples to keep (value between 0 and 1).
-    :return: A new dataset with reduced samples for the target class.
-    """
-
-    # Get all indices for the target class and other classes
-    target_class_indices = [
-        i for i, label in enumerate(dataset["label"]) if label == target_class
-    ]
-    other_class_indices = [
-        i for i, label in enumerate(dataset["label"]) if label != target_class
-    ]
-
-    # Determine the number of target class samples to keep
-    num_samples_to_keep = int(len(target_class_indices) * fraction_to_keep)
-
-    # Randomly select the target class indices to keep
-    selected_target_class_indices = np.random.choice(
-        target_class_indices, num_samples_to_keep, replace=False
-    )
-
-    # Combine the selected target class indices with other class indices
-    final_indices = list(selected_target_class_indices) + other_class_indices
-
-    # Create and return the balanced dataset
-    balanced_dataset = dataset.select(final_indices)
-
-    return balanced_dataset
-
-
 # Dataset
 class EcallistoDataset(Dataset):
     def __init__(
@@ -153,6 +107,53 @@ class EcallistoDatasetBinary(EcallistoDataset):
     def get_class_weights(self):
         labels = self.get_labels()
         labels = np.where(labels != 0, 1, 0)
-        return compute_class_weight(
+        cw = compute_class_weight(
             class_weight="balanced", classes=np.unique(labels), y=labels
         )
+        return cw
+
+
+def to_torch_tensor(example):
+    # Convert the PIL image to a tensor
+    example["image"] = pil_to_tensor(example["image"])
+    return example
+
+
+def scale(example, max_value=255):
+    example["image"] = torch.div(example["image"], max_value)
+    return example
+
+
+def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):
+    """
+    Randomly reduce the number of samples for a specific class in a dataset.
+
+    :param dataset: The dataset to process (assumed to be a Hugging Face dataset).
+    :param target_class: The class label of the class to reduce.
+    :param fraction_to_keep: Fraction of the target class samples to keep (value between 0 and 1).
+    :return: A new dataset with reduced samples for the target class.
+    """
+
+    # Get all indices for the target class and other classes
+    target_class_indices = [
+        i for i, label in enumerate(dataset["label"]) if label == target_class
+    ]
+    other_class_indices = [
+        i for i, label in enumerate(dataset["label"]) if label != target_class
+    ]
+
+    # Determine the number of target class samples to keep
+    num_samples_to_keep = int(len(target_class_indices) * fraction_to_keep)
+
+    # Randomly select the target class indices to keep
+    selected_target_class_indices = np.random.choice(
+        target_class_indices, num_samples_to_keep, replace=False
+    )
+
+    # Combine the selected target class indices with other class indices
+    final_indices = list(selected_target_class_indices) + other_class_indices
+
+    # Create and return the balanced dataset
+    balanced_dataset = dataset.select(final_indices)
+
+    return balanced_dataset

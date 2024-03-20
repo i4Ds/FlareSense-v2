@@ -23,10 +23,12 @@ from torchvision.transforms.functional import to_pil_image
 class EcallistoBase(LightningModule):
     def __init__(self, n_classes, class_weights, unnormalize_img, min_precision):
         super().__init__()
-        self.task = "binary" if n_classes == 2 else "multiclass"
+        self.task = "binary" if n_classes == 1 else "multiclass"
         self.recall = Recall(task=self.task, num_classes=n_classes)
         self.precision = Precision(task=self.task, num_classes=n_classes)
-        self.rafp = RecallAtFixedPrecision(task=self.task, min_precision=min_precision)
+        self.rafp = RecallAtFixedPrecision(
+            task=self.task, num_classes=n_classes, min_precision=min_precision
+        )
         self.f1_score = F1Score(task=self.task, num_classes=n_classes, average="macro")
         self.confmat = ConfusionMatrix(task=self.task, num_classes=n_classes)
         self.class_weights = class_weights
@@ -37,6 +39,11 @@ class EcallistoBase(LightningModule):
         self.fn_examples = []
         self.results = defaultdict(lambda: {"TP": 0, "TN": 0, "FP": 0, "FN": 0})
         self.unnormalize_img = unnormalize_img
+
+    def _calculate_prediction(y_hat):
+        probabilities = F.softmax(y_hat, dim=1).squeeze()[:, 1]
+        preds = torch.where(probabilities > 0.5, 1, 0).squeeze()
+        return probabilities, preds
 
     def training_step(self, batch, batch_idx):
         x, y, _ = batch
@@ -63,8 +70,7 @@ class EcallistoBase(LightningModule):
             prog_bar=True,
             sync_dist=True,
         )
-        preds = torch.argmax(y_hat, dim=1)
-        probabilities = F.softmax(y_hat, dim=1)[:, 1]
+        probabilities, preds = self._calculate_prediction(y_hat)
         # Update confusion matrix and other metrics
         self.confmat.update(preds, y)
         self.precision.update(preds, y)
@@ -109,8 +115,8 @@ class EcallistoBase(LightningModule):
 
     def test_step(self, batch, batch_idx):
         images, labels, antennas = batch
-        outputs = self(images)
-        _, preds = torch.max(outputs, dim=1)
+        y_hat = self(images)
+        probabilities, preds = self._calculate_prediction(y_hat)
 
         for img, label, pred, antenna in zip(images, labels, preds, antennas):
             key = (antenna, label)
@@ -126,8 +132,7 @@ class EcallistoBase(LightningModule):
 
         # Calculate metrics
         y_hat = self(images)
-        preds = torch.argmax(y_hat, dim=1)
-        probabilities = F.softmax(y_hat, dim=1)[:, 1]
+        probabilities = F.sigmoid(y_hat, dim=1)
 
         # Update confusion matrix and other metrics
         self.confmat.update(preds, labels)
@@ -209,16 +214,11 @@ class EfficientNet(EcallistoBase):
             min_precision=min_precision,
         )
         self.efficient_net = models.efficientnet_v2_s(
-            weights=model_weights, dropout=dropout
+            weights=model_weights,
+            dropout=dropout,
+            num_classes=n_classes,
         )
         self.learnig_rate = learnig_rate
-        # Dynamically obtain the in_features from the current classifier layer
-        in_features = self.efficient_net.classifier[1].in_features
-
-        # Adapt the classifier layer to the number of output classes
-        self.efficient_net.classifier[1] = nn.Linear(
-            in_features=in_features, out_features=n_classes, bias=True
-        )
 
     def forward(self, x):
         # Convert grayscale image to 3-channel image if it's not already
@@ -235,6 +235,7 @@ class ResNet18(EcallistoBase):
         self,
         n_classes,
         class_weights,
+        learnig_rate,
         unnormalize_img,
         min_precision,
         model_weights=None,
@@ -245,13 +246,8 @@ class ResNet18(EcallistoBase):
             unnormalize_img=unnormalize_img,
             min_precision=min_precision,
         )
-        self.resnet18 = models.resnet18(weights=model_weights)
-
-        # Replace the final fully connected layer with a new one adapted to the number of classes
-        in_features = self.resnet18.fc.in_features
-        self.resnet18.fc = nn.Linear(
-            in_features=in_features, out_features=n_classes, bias=True
-        )
+        self.resnet18 = models.resnet18(weights=model_weights, num_classes=n_classes)
+        self.learnig_rate = learnig_rate
 
     def forward(self, x):
         # ResNet-18 expects 3-channel input, so ensure the input x is 3-channel
@@ -260,7 +256,7 @@ class ResNet18(EcallistoBase):
         return self.resnet18(x)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-4)
+        return torch.optim.Adam(self.parameters(), lr=self.learnig_rate)
 
 
 def create_normalize_function(antenna_stats):
