@@ -195,7 +195,7 @@ if __name__ == "__main__":
         ds_test,
         batch_size=config["general"]["batch_size"],
         num_workers=8,
-        shuffle=False,
+        shuffle=False,  # To randomly log images
         persistent_workers=False,
     )
     trainer.test(model, test_dataloader, ckpt_path="best")

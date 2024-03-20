@@ -64,7 +64,7 @@ class EcallistoBase(LightningModule):
             sync_dist=True,
         )
         preds = torch.argmax(y_hat, dim=1)
-        probabilities = torch.sigmoid(y_hat).squeeze() if self.task == 'binary' else torch.softmax(y_hat, dim=1).squeeze()
+        probabilities = F.softmax(y_hat, dim=1)[:, 1]
         # Update confusion matrix and other metrics
         self.confmat.update(preds, y)
         self.precision.update(preds, y)
@@ -83,7 +83,8 @@ class EcallistoBase(LightningModule):
         self.log("val_precision", pre, prog_bar=True)
         self.log("val_recall", rec, prog_bar=True)
         self.log("val_f1", f1, prog_bar=True)
-        self.log("val_recallatfixedprecision", rafp, prog_bar=True)
+        self.log("val_rafp", rafp[0], prog_bar=True)
+        self.log("val_rafp_thres", rafp[1], prog_bar=True)
 
         # Calculate conf matrix
         confmat = self.confmat.compute()
@@ -95,7 +96,7 @@ class EcallistoBase(LightningModule):
 
         # Log the confusion matrix as an image to wandb
         self.logger.experiment.log(
-            {"confusion_matrix": [wandb.Image(plt, caption="Confusion Matrix")]}
+            {"confusion_matrix": [wandb.Image(plt, caption="Val Confusion Matrix")]}
         )
 
         plt.close(fig)
@@ -114,83 +115,61 @@ class EcallistoBase(LightningModule):
         for img, label, pred, antenna in zip(images, labels, preds, antennas):
             key = (antenna, label)
 
-            if label == pred:
-                if label == 1:  # Assuming 1 is the positive class
-                    self.results[key]["TP"] += 1
-                else:
-                    self.results[key]["TN"] += 1
-            else:
+            if label != pred:
                 if label == 0:  # Assuming 0 is the negative class
                     self.results[key]["FP"] += 1
                     if len(self.fp_examples) < 15:
                         self.fp_examples.append((img, antenna, label))
                 else:
-                    self.results[key]["FN"] += 1
                     if len(self.fn_examples) < 15:
                         self.fn_examples.append((img, antenna, label))
 
+        # Calculate metrics
+        y_hat = self(images)
+        preds = torch.argmax(y_hat, dim=1)
+        probabilities = F.softmax(y_hat, dim=1)[:, 1]
+
+        # Update confusion matrix and other metrics
+        self.confmat.update(preds, labels)
+        self.precision.update(preds, labels)
+        self.recall.update(preds, labels)
+        self.f1_score.update(preds, labels)
+        self.rafp.update(probabilities, labels)
+
     def on_test_epoch_end(self):
-        # Initialize a wandb Table
-        metrics_table = wandb.Table(
-            columns=["Antenna", "Label", "Precision", "Recall", "F1"]
+        # Calculate and log metrics
+        pre = self.precision.compute()
+        rec = self.recall.compute()
+        f1 = self.f1_score.compute()
+        rafp = self.rafp.compute()
+
+        # Log the computed metrics
+        self.log("test_precision", pre, prog_bar=True)
+        self.log("test_recall", rec, prog_bar=True)
+        self.log("test_f1", f1, prog_bar=True)
+        self.log("test_rafp", rafp[0], prog_bar=True)
+        self.log("test_rafp_thres", rafp[1], prog_bar=True)
+
+        # Calculate conf matrix
+        confmat = self.confmat.compute()
+        fig, ax = plt.subplots()
+        sns.heatmap(confmat.cpu().numpy(), annot=True, fmt="g", ax=ax)
+        ax.set_xlabel("Predicted labels")
+        ax.set_ylabel("True labels")
+        ax.set_title("Confusion Matrix")
+
+        # Log the confusion matrix as an image to wandb
+        self.logger.experiment.log(
+            {"confusion_matrix": [wandb.Image(plt, caption="Test Confusion Matrix")]}
         )
 
-        overall_metrics = {"TP": 0, "FP": 0, "FN": 0, "TN": 0}
-        for key, result in self.results.items():
-            precision = (
-                result["TP"] / (result["TP"] + result["FP"])
-                if (result["TP"] + result["FP"]) > 0
-                else 0
-            )
-            recall = (
-                result["TP"] / (result["TP"] + result["FN"])
-                if (result["TP"] + result["FN"]) > 0
-                else 0
-            )
-            f1 = (
-                2 * (precision * recall) / (precision + recall)
-                if (precision + recall) > 0
-                else 0
-            )
-
-            # Add data to the table
-            metrics_table.add_data(key[0], key[1], precision, recall, f1)
-
-            # Update overall metrics
-            for metric in overall_metrics.keys():
-                overall_metrics[metric] += result[metric]
-
-        # Calculate overall metrics
-        overall_precision = (
-            overall_metrics["TP"] / (overall_metrics["TP"] + overall_metrics["FP"])
-            if (overall_metrics["TP"] + overall_metrics["FP"]) > 0
-            else 0
-        )
-        overall_recall = (
-            overall_metrics["TP"] / (overall_metrics["TP"] + overall_metrics["FN"])
-            if (overall_metrics["TP"] + overall_metrics["FN"]) > 0
-            else 0
-        )
-        overall_f1 = (
-            2
-            * (overall_precision * overall_recall)
-            / (overall_precision + overall_recall)
-            if (overall_precision + overall_recall) > 0
-            else 0
-        )
-
-        # Log the table to wandb
-        wandb.log({"Metrics by Antenna/Label": metrics_table})
-
-        # Optionally, log overall metrics as a separate entry or include them in the table as well
-        wandb.log(
-            {
-                "Overall Precision": overall_precision,
-                "Overall Recall": overall_recall,
-                "Overall F1": overall_f1,
-            }
-        )
-
+        plt.close(fig)
+        # Reset metrics for the next epoch
+        self.precision.reset()
+        self.recall.reset()
+        self.f1_score.reset()
+        self.rafp.reset()
+        self.confmat.reset()
         # Upload images
         fp_images = [
             wandb.Image(
