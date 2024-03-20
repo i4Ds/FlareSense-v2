@@ -106,20 +106,10 @@ class EcallistoDataset(Dataset):
         """Function to return samples corresponding to a given index from a dataset"""
         example = self.to_torch_tensor(self.data[index])
 
-        # Base augmentation
+        # Base transform
         example["image"] = self.base_transform(example["image"])
 
-        # Augmentation
-        label = example["label"].item()
-        augmentation_prob = self.dataset_label_weight[label] / max(
-            self.dataset_label_weight
-        )
-
-        if (
-            self.data_augm_transform is not None
-            and label != 0
-            and random.random() < augmentation_prob
-        ):
+        if self.data_augm_transform is not None:
             example["image"] = self.data_augm_transform(example["image"])
 
         # Normalization
@@ -128,7 +118,7 @@ class EcallistoDataset(Dataset):
         )
 
         # Returns all
-        return example["image"], example["label"], example["antenna"], example["type"]
+        return example["image"], example["label"], example["antenna"]
 
 
 class EcallistoDatasetBinary(EcallistoDataset):
@@ -149,12 +139,12 @@ class EcallistoDatasetBinary(EcallistoDataset):
 
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
-        image, label, antenna, type = super().__getitem__(index)
+        image, label, antenna = super().__getitem__(index)
 
         # Convert label to binary
         label = 0 if label.item() == 0 else 1
 
-        return image, torch.tensor(label), antenna, type
+        return image, torch.tensor(label), antenna
 
     def get_labels(self):
         # Return binary labels: 0 if the label is 0, 1 otherwise

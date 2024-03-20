@@ -2,6 +2,7 @@ general:
   batch_size: 32
   max_epochs: 1
   binary: True
+  min_precision: 0.8 # Max Recall for min Precision Metric.
   use_random_sampler: False
   use_class_weights: True
 

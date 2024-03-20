@@ -6,10 +6,18 @@ metric:
   name: val_f1
   goal: maximize
 parameters:
+  model:
+    parameters:
+      lr:
+        values: [1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6]
+  data:
+    parameters:
+      use_augmentation:
+        values: [True, False]
 
 
 command:
   - ${interpreter}
   - ${program}
-  - "--config_name"
-  - "sweep" #Insert your model here (do not push it, adapt it each time.)
+  - "--configs"
+  - "configs/t100.yml" #Insert your model here (do not push it, adapt it each time.)

@@ -163,6 +163,7 @@ if __name__ == "__main__":
         n_classes=len(np.unique(ds_train.get_labels())),
         class_weights=cw if config["general"]["use_class_weights"] else None,
         learnig_rate=config["model"]["lr"],
+        min_precision=config["general"]["min_precision"],
         unnormalize_img=unnormalize_img,
     )
 
@@ -185,13 +186,13 @@ if __name__ == "__main__":
     )
 
     ## Evaluate
-    ds_valid = dataset(
+    ds_test = dataset(
         dd["test"],
         base_transform=base_transform,
         normalization_transform=normalize_transform,
     )
     test_dataloader = DataLoader(
-        ds_valid,
+        ds_test,
         batch_size=config["general"]["batch_size"],
         num_workers=8,
         shuffle=False,

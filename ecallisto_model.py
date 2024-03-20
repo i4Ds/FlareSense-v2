@@ -7,7 +7,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning import LightningModule
-from torchmetrics import Accuracy, ConfusionMatrix, F1Score, Recall, Precision
+from torchmetrics import (
+    ConfusionMatrix,
+    F1Score,
+    Recall,
+    Precision,
+    RecallAtFixedPrecision,
+)
 from torchvision import models
 from collections import defaultdict
 import wandb
@@ -15,29 +21,30 @@ from torchvision.transforms.functional import to_pil_image
 
 
 class EcallistoBase(LightningModule):
-    def __init__(self, n_classes, class_weights, unnormalize_img):
+    def __init__(self, n_classes, class_weights, unnormalize_img, min_precision):
         super().__init__()
-        self.recall = Recall(task="multiclass", num_classes=n_classes)
-        self.precision = Precision(task="multiclass", num_classes=n_classes)
-        self.f1_score = F1Score(
-            task="multiclass", num_classes=n_classes, average="macro"
-        )
-        self.confmat = ConfusionMatrix(task="multiclass", num_classes=n_classes)
+        self.task = "binary" if n_classes == 2 else "multiclass"
+        self.recall = Recall(task=self.task, num_classes=n_classes)
+        self.precision = Precision(task=self.task, num_classes=n_classes)
+        self.rafp = RecallAtFixedPrecision(task=self.task, min_precision=min_precision)
+        self.f1_score = F1Score(task=self.task, num_classes=n_classes, average="macro")
+        self.confmat = ConfusionMatrix(task=self.task, num_classes=n_classes)
         self.class_weights = class_weights
+        self.loss_function = F.cross_entropy
 
         ## Test parameters
         self.fp_examples = []
         self.fn_examples = []
-        self.results = defaultdict(lambda: {"correct": 0, "total": 0})
+        self.results = defaultdict(lambda: {"TP": 0, "TN": 0, "FP": 0, "FN": 0})
         self.unnormalize_img = unnormalize_img
 
     def training_step(self, batch, batch_idx):
-        x, y, _, _ = batch
+        x, y, _ = batch
         y_hat = self(x)
         if self.class_weights is not None:
-            loss = F.cross_entropy(y_hat, y, weight=self.class_weights.to(y.device))
+            loss = self.loss_function(y_hat, y, weight=self.class_weights.to(y.device))
         else:
-            loss = F.cross_entropy(y_hat, y)
+            loss = self.loss_function(y_hat, y)
         # logs metrics for each training_step - [default:True],
         self.log(
             "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
@@ -45,20 +52,40 @@ class EcallistoBase(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y, _, _ = batch
+        x, y, _ = batch
         y_hat = self(x)
-        loss = F.cross_entropy(y_hat, y)
+        loss = self.loss_function(y_hat, y)
+        self.log(
+            "val_loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            sync_dist=True,
+        )
         preds = torch.argmax(y_hat, dim=1)
+        probabilities = torch.sigmoid(y_hat).squeeze() if self.task == 'binary' else torch.softmax(y_hat, dim=1).squeeze()
+        # Update confusion matrix and other metrics
         self.confmat.update(preds, y)
-        pre = self.precision(y_hat, y)
-        rec = self.recall(y_hat, y)
-        f1 = self.f1_score(y_hat, y)
-        self.log("val_precision", pre, prog_bar=True, logger=True)
-        self.log("val_recall", rec, prog_bar=True, logger=True)
-        self.log("val_f1", f1, prog_bar=True, logger=True)
-        self.log("val_loss", loss, prog_bar=True, logger=True)
+        self.precision.update(preds, y)
+        self.recall.update(preds, y)
+        self.f1_score.update(preds, y)
+        self.rafp.update(probabilities, y)
 
     def on_validation_epoch_end(self):
+        # Calculate and log metrics
+        pre = self.precision.compute()
+        rec = self.recall.compute()
+        f1 = self.f1_score.compute()
+        rafp = self.rafp.compute()
+
+        # Log the computed metrics
+        self.log("val_precision", pre, prog_bar=True)
+        self.log("val_recall", rec, prog_bar=True)
+        self.log("val_f1", f1, prog_bar=True)
+        self.log("val_recallatfixedprecision", rafp, prog_bar=True)
+
+        # Calculate conf matrix
         confmat = self.confmat.compute()
         fig, ax = plt.subplots()
         sns.heatmap(confmat.cpu().numpy(), annot=True, fmt="g", ax=ax)
@@ -72,17 +99,20 @@ class EcallistoBase(LightningModule):
         )
 
         plt.close(fig)
-
-        # Reset the confusion matrix for the next epoch
+        # Reset metrics for the next epoch
+        self.precision.reset()
+        self.recall.reset()
+        self.f1_score.reset()
+        self.rafp.reset()
         self.confmat.reset()
 
     def test_step(self, batch, batch_idx):
-        images, labels, antennas, types = batch
+        images, labels, antennas = batch
         outputs = self(images)
         _, preds = torch.max(outputs, dim=1)
 
-        for label, pred, antenna, typ in zip(labels, preds, antennas, types):
-            key = (antenna, typ)
+        for img, label, pred, antenna in zip(images, labels, preds, antennas):
+            key = (antenna, label)
 
             if label == pred:
                 if label == 1:  # Assuming 1 is the positive class
@@ -93,16 +123,16 @@ class EcallistoBase(LightningModule):
                 if label == 0:  # Assuming 0 is the negative class
                     self.results[key]["FP"] += 1
                     if len(self.fp_examples) < 15:
-                        self.fp_examples.append((images, antenna, typ))
+                        self.fp_examples.append((img, antenna, label))
                 else:
                     self.results[key]["FN"] += 1
                     if len(self.fn_examples) < 15:
-                        self.fn_examples.append((images, antenna, typ))
+                        self.fn_examples.append((img, antenna, label))
 
-    def on_test_epoch_end(self, outputs):
+    def on_test_epoch_end(self):
         # Initialize a wandb Table
         metrics_table = wandb.Table(
-            columns=["Antenna", "Type", "Precision", "Recall", "F1"]
+            columns=["Antenna", "Label", "Precision", "Recall", "F1"]
         )
 
         overall_metrics = {"TP": 0, "FP": 0, "FN": 0, "TN": 0}
@@ -150,7 +180,7 @@ class EcallistoBase(LightningModule):
         )
 
         # Log the table to wandb
-        wandb.log({"Metrics by Antenna/Type": metrics_table})
+        wandb.log({"Metrics by Antenna/Label": metrics_table})
 
         # Optionally, log overall metrics as a separate entry or include them in the table as well
         wandb.log(
@@ -165,7 +195,7 @@ class EcallistoBase(LightningModule):
         fp_images = [
             wandb.Image(
                 to_pil_image(self.unnormalize_img(img[0], img[1])),
-                caption=f"Antenna: {img[1]}. Type: {img[2]}",
+                caption=f"Antenna: {img[1]}. Label: {img[2]}",
             )
             for img in self.fp_examples
         ]
@@ -175,7 +205,7 @@ class EcallistoBase(LightningModule):
         fn_images = [
             wandb.Image(
                 to_pil_image(self.unnormalize_img(img[0], img[1])),
-                caption=f"Antenna: {img[1]}. Type: {img[2]}",
+                caption=f"Antenna: {img[1]}. Label: {img[2]}",
             )
             for img in self.fn_examples
         ]
@@ -183,8 +213,21 @@ class EcallistoBase(LightningModule):
 
 
 class EfficientNet(EcallistoBase):
-    def __init__(self, n_classes, class_weights, learnig_rate, model_weights=None):
-        super().__init__(n_classes=n_classes, class_weights=class_weights)
+    def __init__(
+        self,
+        n_classes,
+        class_weights,
+        learnig_rate,
+        unnormalize_img,
+        min_precision,
+        model_weights=None,
+    ):
+        super().__init__(
+            n_classes=n_classes,
+            class_weights=class_weights,
+            unnormalize_img=unnormalize_img,
+            min_precision=min_precision,
+        )
         self.efficient_net = models.efficientnet_v2_s(weights=model_weights)
         self.learnig_rate = learnig_rate
         # Dynamically obtain the in_features from the current classifier layer
@@ -206,8 +249,20 @@ class EfficientNet(EcallistoBase):
 
 
 class ResNet18(EcallistoBase):
-    def __init__(self, n_classes, class_weights, model_weights=None):
-        super().__init__(n_classes=n_classes, class_weights=class_weights)
+    def __init__(
+        self,
+        n_classes,
+        class_weights,
+        unnormalize_img,
+        min_precision,
+        model_weights=None,
+    ):
+        super().__init__(
+            n_classes=n_classes,
+            class_weights=class_weights,
+            unnormalize_img=unnormalize_img,
+            min_precision=min_precision,
+        )
         self.resnet18 = models.resnet18(weights=model_weights)
 
         # Replace the final fully connected layer with a new one adapted to the number of classes
@@ -251,6 +306,6 @@ def create_unnormalize_function(antenna_stats):
             unnormalized_image * (stats["max"] - stats["min"]) + stats["min"]
         )
 
-        return unnormalized_image
+        return unnormalized_image.to(torch.uint8)
 
     return unnormalize
