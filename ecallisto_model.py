@@ -52,7 +52,7 @@ class EcallistoBase(LightningModule):
             loss = self.loss_function(y_hat, y)
         # logs metrics for each training_step - [default:True],
         self.log(
-            "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
+            "train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
         )
         return loss
 
@@ -64,7 +64,7 @@ class EcallistoBase(LightningModule):
             "val_loss",
             loss,
             on_step=False,
-            on_epoch=True,
+            on_epoch=False,
             prog_bar=True,
             sync_dist=True,
         )
