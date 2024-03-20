@@ -9,4 +9,4 @@
 #SBATCH --error=logs/%j.err
 
 # python3 create_yaml_mean_std_min_max_antenna.py
-srun python3 main.py --config configs/t100.yml
+wandb agent vincenzo-timmel/FlareSense-v2/s0q1xzl4

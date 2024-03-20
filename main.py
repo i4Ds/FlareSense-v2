@@ -139,21 +139,12 @@ if __name__ == "__main__":
     )
 
     # Checkpoint to save the best model based on the lowest validation loss
-    checkpoint_callback_loss = ModelCheckpoint(
-        monitor="val_loss",
+    checkpoint_callback_rafp = ModelCheckpoint(
+        monitor="val_rafp",
         dirpath=wandb_logger.experiment.dir,
-        filename="efficientnet-loss-{epoch:02d}-{step:05d}-{val_loss:.2f}",
+        filename="efficientnet-rafp-{epoch:02d}-{step:05d}-{val_loss:.2f}",
         save_top_k=1,
         mode="min",
-    )
-
-    # Checkpoint to save the best model based on the highest F1 score
-    checkpoint_callback_f1 = ModelCheckpoint(
-        monitor="val_f1",
-        dirpath=wandb_logger.experiment.dir,
-        filename="efficientnet-f1-{epoch:02d}-{step:05d}-{val_f1:.2f}",
-        save_top_k=1,
-        mode="max",
     )
 
     # Setup Model
@@ -162,6 +153,7 @@ if __name__ == "__main__":
     model = EfficientNet(
         n_classes=len(np.unique(ds_train.get_labels())),
         class_weights=cw if config["general"]["use_class_weights"] else None,
+        dropout=config["model"]["dropout"],
         learnig_rate=config["model"]["lr"],
         min_precision=config["general"]["min_precision"],
         unnormalize_img=unnormalize_img,
@@ -173,8 +165,7 @@ if __name__ == "__main__":
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
         callbacks=[
-            checkpoint_callback_loss,
-            checkpoint_callback_f1,
+            checkpoint_callback_rafp,
             EarlyStopping(monitor="val_loss", mode="min", patience=20),
         ],
         val_check_interval=200,
@@ -195,7 +186,7 @@ if __name__ == "__main__":
         ds_test,
         batch_size=config["general"]["batch_size"],
         num_workers=8,
-        shuffle=False,  # To randomly log images
+        shuffle=True,  # To randomly log images
         persistent_workers=False,
     )
     trainer.test(model, test_dataloader, ckpt_path="best")

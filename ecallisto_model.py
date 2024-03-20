@@ -199,6 +199,7 @@ class EfficientNet(EcallistoBase):
         learnig_rate,
         unnormalize_img,
         min_precision,
+        dropout,
         model_weights=None,
     ):
         super().__init__(
@@ -207,7 +208,9 @@ class EfficientNet(EcallistoBase):
             unnormalize_img=unnormalize_img,
             min_precision=min_precision,
         )
-        self.efficient_net = models.efficientnet_v2_s(weights=model_weights)
+        self.efficient_net = models.efficientnet_v2_s(
+            weights=model_weights, dropout=dropout
+        )
         self.learnig_rate = learnig_rate
         # Dynamically obtain the in_features from the current classifier layer
         in_features = self.efficient_net.classifier[1].in_features

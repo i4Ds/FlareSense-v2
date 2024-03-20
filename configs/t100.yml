@@ -1,6 +1,6 @@
 general:
   batch_size: 32
-  max_epochs: 1
+  max_epochs: 10
   binary: True
   min_precision: 0.8 # Max Recall for min Precision Metric.
   use_random_sampler: False
@@ -9,6 +9,7 @@ general:
 model:
   input_size: [224, 244]
   lr: 1.0e-4
+  dropout: 0.2
 
 data:
   train_class_to_reduce: 0
