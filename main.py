@@ -4,7 +4,7 @@ import torch
 import yaml
 from datasets import DatasetDict, load_dataset
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchaudio.transforms import FrequencyMasking, TimeMasking
@@ -17,6 +17,7 @@ from ecallisto_dataset import (
 )
 from ecallisto_model import (
     EfficientNet,
+    ResNet18,
     create_normalize_function,
     create_unnormalize_function,
 )
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 
     # Setup wandb
     wandb.init(entity="vincenzo-timmel", config=config)
-    wandb_logger = WandbLogger(log_model="all")
+    wandb_logger = WandbLogger(log_model=False)  # Push it only on training end.
 
     # Overwrite config with wandb config (for sweep etc.)
     del config
@@ -142,7 +143,7 @@ if __name__ == "__main__":
     checkpoint_callback_rafp = ModelCheckpoint(
         monitor="val_loss",
         dirpath=wandb_logger.experiment.dir,
-        filename="efficientnet-loss-{epoch:02d}-{step:05d}-{val_loss:.2f}",
+        filename="loss-{epoch:02d}-{step:05d}-{val_loss:.2f}",
         save_top_k=1,
         mode="min",
     )
@@ -150,12 +151,12 @@ if __name__ == "__main__":
     # Setup Model
     cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
     unnormalize_img = create_unnormalize_function(antenna_stats)
-    model = EfficientNet(
+    model = ResNet18(
         n_classes=2,  # Binary
         class_weights=(cw if config["general"]["use_class_weights"] else None),
-        dropout=config["model"]["dropout"],
+        # dropout=config["model"]["dropout"],
+        batch_size=config["general"]["batch_size"],
         learnig_rate=config["model"]["lr"],
-        min_precision=config["general"]["min_precision"],
         unnormalize_img=unnormalize_img,
     )
 
@@ -165,10 +166,6 @@ if __name__ == "__main__":
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
         enable_progress_bar=False,
-        callbacks=[
-            checkpoint_callback_rafp,
-            EarlyStopping(monitor="val_loss", mode="min", patience=20),
-        ],
         val_check_interval=200,
     )
 

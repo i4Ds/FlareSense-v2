@@ -15,7 +15,7 @@ from torchvision.transforms.functional import to_pil_image
 
 
 class EcallistoBase(LightningModule):
-    def __init__(self, n_classes, class_weights, unnormalize_img, min_precision):
+    def __init__(self, n_classes, class_weights, unnormalize_img, batch_size):
         super().__init__()
         self.task = "binary" if n_classes == 1 else "multiclass"
         self.recall = Recall(task=self.task, num_classes=n_classes)
@@ -24,6 +24,7 @@ class EcallistoBase(LightningModule):
         self.confmat = ConfusionMatrix(task=self.task, num_classes=n_classes)
         self.class_weights = class_weights
         self.loss_function = F.cross_entropy
+        self.batch_size = batch_size
 
         ## Test parameters
         self.fp_examples = []
@@ -44,9 +45,8 @@ class EcallistoBase(LightningModule):
             loss = self.loss_function(y_hat, y, weight=self.class_weights.to(y.device))
         else:
             loss = self.loss_function(y_hat, y)
-        # logs metrics for each training_step - [default:True],
         self.log(
-            "train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
+            "train_loss", loss, on_step=True, prog_bar=True, batch_size=self.batch_size
         )
         return loss
 
@@ -55,12 +55,7 @@ class EcallistoBase(LightningModule):
         y_hat = self(x)
         loss = self.loss_function(y_hat, y)
         self.log(
-            "val_loss",
-            loss,
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
-            sync_dist=True,
+            "val_loss", loss, on_step=True, prog_bar=True, batch_size=self.batch_size
         )
         _, preds = self._calculate_prediction(y_hat)
         # Update confusion matrix and other metrics
@@ -76,9 +71,9 @@ class EcallistoBase(LightningModule):
         f1 = self.f1_score.compute()
 
         # Log the computed metrics
-        self.log("val_precision", pre, prog_bar=True)
-        self.log("val_recall", rec, prog_bar=True)
-        self.log("val_f1", f1, prog_bar=True)
+        self.log("val_precision", pre, prog_bar=True, batch_size=self.batch_size)
+        self.log("val_recall", rec, prog_bar=True, batch_size=self.batch_size)
+        self.log("val_f1", f1, prog_bar=True, batch_size=self.batch_size)
 
         # Calculate conf matrix
         confmat = self.confmat.compute()
@@ -133,9 +128,9 @@ class EcallistoBase(LightningModule):
         f1 = self.f1_score.compute()
 
         # Log the computed metrics
-        self.log("test_precision", pre, prog_bar=True)
-        self.log("test_recall", rec, prog_bar=True)
-        self.log("test_f1", f1, prog_bar=True)
+        self.log("test_precision", pre, prog_bar=True, batch_size=self.batch_size)
+        self.log("test_recall", rec, prog_bar=True, batch_size=self.batch_size)
+        self.log("test_f1", f1, prog_bar=True, batch_size=self.batch_size)
 
         # Calculate conf matrix
         confmat = self.confmat.compute()
@@ -176,6 +171,12 @@ class EcallistoBase(LightningModule):
         ]
         wandb.log({"False Negatives": fn_images})
 
+    def on_train_end(self):
+        # Log the best model to wandb at the end of training
+        best_model_path = self.trainer.checkpoint_callback.best_model_path
+        if best_model_path:
+            wandb.log_artifact(best_model_path, type="model", name="best_model")
+
 
 class EfficientNet(EcallistoBase):
     def __init__(
@@ -184,15 +185,15 @@ class EfficientNet(EcallistoBase):
         class_weights,
         learnig_rate,
         unnormalize_img,
-        min_precision,
         dropout,
+        batch_size,
         model_weights=None,
     ):
         super().__init__(
             n_classes=n_classes,
             class_weights=class_weights,
             unnormalize_img=unnormalize_img,
-            min_precision=min_precision,
+            batch_size=batch_size,
         )
         self.efficient_net = models.efficientnet_v2_s(
             weights=model_weights,
@@ -218,14 +219,14 @@ class ResNet18(EcallistoBase):
         class_weights,
         learnig_rate,
         unnormalize_img,
-        min_precision,
+        batch_size,
         model_weights=None,
     ):
         super().__init__(
             n_classes=n_classes,
             class_weights=class_weights,
             unnormalize_img=unnormalize_img,
-            min_precision=min_precision,
+            batch_size=batch_size,
         )
         self.resnet18 = models.resnet18(weights=model_weights, num_classes=n_classes)
         self.learnig_rate = learnig_rate
@@ -247,6 +248,7 @@ def create_normalize_function(antenna_stats, simple):
 
         # Apply normalization (Assuming image is a torch.Tensor)
         normalized_image = (image - stats["min"]) / (stats["max"] - stats["min"])
+        # normalized_image = (2 * ((image - stats["min"]) / (stats["max"] - stats["min"])) - 1)
         normalized_image = (normalized_image - stats["mean"]) / stats["std"]
 
         return normalized_image
