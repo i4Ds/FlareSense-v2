@@ -1,8 +1,5 @@
 # Modeling
 import argparse
-import sys
-
-import numpy as np
 import torch
 import yaml
 from datasets import DatasetDict, load_dataset

@@ -7,13 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning import LightningModule
-from torchmetrics import (
-    ConfusionMatrix,
-    F1Score,
-    Recall,
-    Precision,
-    RecallAtFixedPrecision,
-)
+from torchmetrics import ConfusionMatrix, F1Score, Recall, Precision
 from torchvision import models
 from collections import defaultdict
 import wandb
