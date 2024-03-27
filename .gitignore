@@ -161,3 +161,4 @@ cython_debug/
 wandb/*
 lightning_logs/*
 logs/*
+FlareSense-v2/**/*.ckpt
