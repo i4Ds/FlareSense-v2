@@ -16,7 +16,6 @@ from ecallisto_dataset import (
     EcallistoDatasetBinary,
 )
 from ecallisto_model import (
-    EfficientNet,
     ResNet18,
     create_normalize_function,
     create_unnormalize_function,

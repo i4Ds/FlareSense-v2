@@ -39,7 +39,7 @@ class EcallistoBase(LightningModule):
         return probabilities, preds
 
     def training_step(self, batch, batch_idx):
-        x, y, _ = batch
+        x, y, _, _ = batch
         y_hat = self(x)
         if self.class_weights is not None:
             loss = self.loss_function(y_hat, y, weight=self.class_weights.to(y.device))
@@ -51,7 +51,7 @@ class EcallistoBase(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y, _ = batch
+        x, y, _, _ = batch
         y_hat = self(x)
         loss = self.loss_function(y_hat, y)
         self.log(
@@ -182,11 +182,11 @@ class EfficientNet(EcallistoBase):
     def __init__(
         self,
         n_classes,
-        class_weights,
-        learnig_rate,
-        unnormalize_img,
-        dropout,
-        batch_size,
+        class_weights=None,
+        learnig_rate=None,
+        unnormalize_img=None,
+        dropout=None,
+        batch_size=None,
         model_weights=None,
     ):
         super().__init__(
@@ -216,10 +216,10 @@ class ResNet18(EcallistoBase):
     def __init__(
         self,
         n_classes,
-        class_weights,
-        learnig_rate,
-        unnormalize_img,
-        batch_size,
+        class_weights=None,
+        learnig_rate=None,
+        unnormalize_img=None,
+        batch_size=None,
         model_weights=None,
     ):
         super().__init__(
