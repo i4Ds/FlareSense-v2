@@ -55,7 +55,12 @@ class EcallistoBase(LightningModule):
         y_hat = self(x)
         loss = self.loss_function(y_hat, y)
         self.log(
-            "val_loss", loss, on_step=True, prog_bar=True, batch_size=self.batch_size
+            "val_loss",
+            loss,
+            prog_bar=True,
+            batch_size=self.batch_size,
+            on_epoch=True,
+            on_step=False,
         )
         _, preds = self._calculate_prediction(y_hat)
         # Update confusion matrix and other metrics
@@ -71,9 +76,29 @@ class EcallistoBase(LightningModule):
         f1 = self.f1_score.compute()
 
         # Log the computed metrics
-        self.log("val_precision", pre, prog_bar=True, batch_size=self.batch_size)
-        self.log("val_recall", rec, prog_bar=True, batch_size=self.batch_size)
-        self.log("val_f1", f1, prog_bar=True, batch_size=self.batch_size)
+        self.log(
+            "val_precision",
+            pre,
+            prog_bar=True,
+            batch_size=self.batch_size,
+            on_epoch=True,
+        )
+        self.log(
+            "val_recall",
+            rec,
+            prog_bar=True,
+            batch_size=self.batch_size,
+            on_epoch=True,
+            on_step=False,
+        )
+        self.log(
+            "val_f1",
+            f1,
+            prog_bar=True,
+            batch_size=self.batch_size,
+            on_epoch=True,
+            on_step=False,
+        )
 
         # Calculate conf matrix
         confmat = self.confmat.compute()
@@ -96,7 +121,7 @@ class EcallistoBase(LightningModule):
         self.confmat.reset()
 
     def test_step(self, batch, batch_idx):
-        images, labels, antennas = batch
+        images, labels, antennas, _ = batch
         y_hat = self(images)
         _, preds = self._calculate_prediction(y_hat)
 

@@ -58,7 +58,7 @@ if __name__ == "__main__":
     print(dict(config))
 
     # Create dataset
-    ds = load_dataset("i4ds/radio-sunburst-ecallisto")
+    ds = load_dataset(config["data"]["path"])
 
     dd = DatasetDict()
     if config["data"]["reduce_non_burst"]:
