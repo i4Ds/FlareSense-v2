@@ -1,6 +1,6 @@
 general:
   batch_size: 32
-  max_epochs: 15
+  max_epochs: 6
   binary: True
   use_random_sampler: False
   use_class_weights: True
