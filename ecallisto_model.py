@@ -7,7 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning import LightningModule
-from torchmetrics import ConfusionMatrix, F1Score, Recall, Precision
+from torchmetrics import ConfusionMatrix
+from torchmetrics.classification import BinaryPrecision, BinaryF1Score, BinaryRecall
 from torchvision import models
 from collections import defaultdict
 import wandb
@@ -18,10 +19,10 @@ class EcallistoBase(LightningModule):
     def __init__(self, n_classes, class_weights, unnormalize_img, batch_size):
         super().__init__()
         self.task = "binary" if n_classes == 1 else "multiclass"
-        self.recall = Recall(task=self.task, num_classes=n_classes)
-        self.precision = Precision(task=self.task, num_classes=n_classes)
-        self.f1_score = F1Score(task=self.task, num_classes=n_classes, average="macro")
-        self.confmat = ConfusionMatrix(task=self.task, num_classes=n_classes)
+        self.recall = BinaryRecall(task=self.task)
+        self.precision = BinaryPrecision(task=self.task)
+        self.f1_score = BinaryF1Score(task=self.task)
+        self.confmat = ConfusionMatrix(task=self.task)
         self.class_weights = class_weights
         self.loss_function = F.cross_entropy
         self.batch_size = batch_size
