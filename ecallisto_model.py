@@ -18,10 +18,10 @@ class EcallistoBase(LightningModule):
     def __init__(self, n_classes, class_weights, unnormalize_img, batch_size):
         super().__init__()
         self.task = "binary" if n_classes == 1 else "multiclass"
-        self.recall = BinaryRecall(task=self.task)
-        self.precision = BinaryPrecision(task=self.task)
-        self.f1_score = BinaryF1Score(task=self.task)
-        self.confmat = ConfusionMatrix(task=self.task)
+        self.recall = BinaryRecall()
+        self.precision = BinaryPrecision()
+        self.f1_score = BinaryF1Score()
+        self.confmat = ConfusionMatrix(task=self.task, num_classes=n_classes)
         self.class_weights = class_weights
         self.loss_function = F.cross_entropy
         self.batch_size = batch_size
