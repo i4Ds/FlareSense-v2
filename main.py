@@ -58,19 +58,19 @@ if __name__ == "__main__":
     print(dict(config))
 
     # Create dataset
-    ds = load_dataset(config["data"]["path"])
+    ds_train = load_dataset(config["data"]["train_path"], split="train")
+    ds_val = load_dataset(config["data"]["train_path"], split="validation")
 
     dd = DatasetDict()
     if config["data"]["reduce_non_burst"]:
         dd["train"] = randomly_reduce_class_samples(
-            ds["train"],
+            ds_train["train"],
             config["data"]["train_class_to_reduce"],
             config["data"]["reduction_fraction"],
         )
     else:
-        dd["train"] = ds["train"]
-    dd["test"] = ds["test"]
-    dd["validation"] = ds["validation"]
+        dd["train"] = ds_train["train"]
+    dd["validation"] = ds_val["validation"]
 
     size = tuple(config["model"]["input_size"])
 
@@ -174,11 +174,15 @@ if __name__ == "__main__":
     )
 
     ## Evaluate
+    # Create test set
+    ds_test = load_dataset(config["data"]["test_path"], split="test")
+
     ds_test = EcallistoDatasetBinary(
-        dd["test"],
+        ds_test,
         base_transform=base_transform,
         normalization_transform=normalize_transform,
     )
+    # Create dataloader
     test_dataloader = DataLoader(
         ds_test,
         batch_size=config["general"]["batch_size"],

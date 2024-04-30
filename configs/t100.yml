@@ -11,8 +11,10 @@ model:
   dropout: 0.2
 
 data:
-  path: i4ds/radio-sunburst-ecallisto
-  reduce_non_burst: True
+  train_path: i4ds/radio-sunburst-ecallisto-binary-cleaned-3
+  val_path: i4ds/radio-sunburst-ecallisto-binary-cleaned-3
+  test_path: i4ds/radio-sunburst-ecallisto-binary-cleaned-by-cm
+  reduce_non_burst: False
   train_class_to_reduce: 0
   reduction_fraction: 0.2
   simple_normalization: False
