@@ -13,7 +13,7 @@ model:
 data:
   train_path: i4ds/radio-sunburst-ecallisto
   val_path: i4ds/radio-sunburst-ecallisto
-  test_path: radio-sunburst-ecallisto-binary-cleaned-by-cm
+  test_path: i4ds/radio-sunburst-ecallisto-binary-cleaned-by-cm
   reduce_non_burst: True
   train_class_to_reduce: 0
   reduction_fraction: 0.2
