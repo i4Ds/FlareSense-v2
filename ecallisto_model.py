@@ -13,6 +13,12 @@ from collections import defaultdict
 import wandb
 from torchvision.transforms.functional import to_pil_image
 
+RESNET_DICT = {
+    "resnet18": models.resnet18,
+    "resnet34": models.resnet34,
+    "resnet52": models.resnet50,
+}
+
 
 class EcallistoBase(LightningModule):
     def __init__(self, n_classes, class_weights, unnormalize_img, batch_size):
@@ -82,6 +88,7 @@ class EcallistoBase(LightningModule):
             prog_bar=True,
             batch_size=self.batch_size,
             on_epoch=True,
+            on_step=False,
         )
         self.log(
             "val_recall",
@@ -237,10 +244,11 @@ class EfficientNet(EcallistoBase):
         return torch.optim.Adam(self.parameters(), lr=self.learnig_rate)
 
 
-class ResNet18(EcallistoBase):
+class ResNet(EcallistoBase):
     def __init__(
         self,
         n_classes,
+        resnet_type,
         class_weights=None,
         learnig_rate=None,
         unnormalize_img=None,
@@ -253,14 +261,16 @@ class ResNet18(EcallistoBase):
             unnormalize_img=unnormalize_img,
             batch_size=batch_size,
         )
-        self.resnet18 = models.resnet18(weights=model_weights, num_classes=n_classes)
+        self.resnet = RESNET_DICT[resnet_type](
+            weights=model_weights, num_classes=n_classes
+        )
         self.learnig_rate = learnig_rate
 
     def forward(self, x):
         # ResNet-18 expects 3-channel input, so ensure the input x is 3-channel
         if x.size(1) == 1:
             x = x.repeat(1, 3, 1, 1)
-        return self.resnet18(x)
+        return self.resnet(x)
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learnig_rate)

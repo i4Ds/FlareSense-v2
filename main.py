@@ -16,7 +16,7 @@ from ecallisto_dataset import (
     EcallistoDatasetBinary,
 )
 from ecallisto_model import (
-    ResNet18,
+    ResNet,
     create_normalize_function,
     create_unnormalize_function,
 )
@@ -145,10 +145,11 @@ if __name__ == "__main__":
     # Setup Model
     cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
     unnormalize_img = create_unnormalize_function(antenna_stats)
-    model = ResNet18(
+    model = ResNet(
         n_classes=2,  # Binary
+        resnet_type=config["model"]["model_type"],
         class_weights=(cw if config["general"]["use_class_weights"] else None),
-        # dropout=config["model"]["dropout"],
+        dropout=config["model"]["dropout"],
         batch_size=config["general"]["batch_size"],
         learnig_rate=config["model"]["lr"],
         unnormalize_img=unnormalize_img,

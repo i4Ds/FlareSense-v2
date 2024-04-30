@@ -6,6 +6,7 @@ general:
   use_class_weights: True
 
 model:
+  model_type: resnet18
   input_size: [224, 244]
   lr: 1.0e-4
   dropout: 0.2
