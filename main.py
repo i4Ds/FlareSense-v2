@@ -61,17 +61,12 @@ if __name__ == "__main__":
     ds_train = load_dataset(config["data"]["train_path"], split="train")
     ds_val = load_dataset(config["data"]["train_path"], split="validation")
 
-    dd = DatasetDict()
     if config["data"]["reduce_non_burst"]:
-        dd["train"] = randomly_reduce_class_samples(
-            ds_train["train"],
+        ds_train = randomly_reduce_class_samples(
+            ds_train,
             config["data"]["train_class_to_reduce"],
             config["data"]["reduction_fraction"],
         )
-    else:
-        dd["train"] = ds_train["train"]
-    dd["validation"] = ds_val["validation"]
-
     size = tuple(config["model"]["input_size"])
 
     # Transforms
@@ -99,13 +94,13 @@ if __name__ == "__main__":
 
     # Data Loader
     ds_train = EcallistoDatasetBinary(
-        dd["train"],
+        ds_train,
         base_transform=base_transform,
         data_augm_transform=data_augm_transform,
         normalization_transform=normalize_transform,
     )
     ds_valid = EcallistoDatasetBinary(
-        dd["validation"],
+        ds_val,
         base_transform=base_transform,
         normalization_transform=normalize_transform,
     )
