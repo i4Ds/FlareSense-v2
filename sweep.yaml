@@ -2,6 +2,7 @@
 program: main.py
 method: bayes
 project: FlareSense-v2
+entity: vincenzo-timmel
 metric:
   name: test_f1
   goal: maximize
@@ -10,8 +11,6 @@ parameters:
     parameters:
       lr:
         values: [1.0e-4, 1.0e-5, 1.0e-6, 1.0e-7]
-      dropout:
-        values: [0.1, 0.2, 0.3]
       model_type:
         values: [resnet18, resnet34, resnet52]
   data:
@@ -19,6 +18,8 @@ parameters:
       use_augmentation:
         values: [True, False]
       simple_normalization:
+        values: [True, False]
+      reduce_non_burst:
         values: [True, False]
 
 

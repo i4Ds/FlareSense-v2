@@ -149,7 +149,6 @@ if __name__ == "__main__":
         n_classes=2,  # Binary
         resnet_type=config["model"]["model_type"],
         class_weights=(cw if config["general"]["use_class_weights"] else None),
-        dropout=config["model"]["dropout"],
         batch_size=config["general"]["batch_size"],
         learnig_rate=config["model"]["lr"],
         unnormalize_img=unnormalize_img,
