@@ -10,7 +10,7 @@ parameters:
   model:
     parameters:
       lr:
-        values: [1.0e-4, 1.0e-5, 1.0e-6, 1.0e-7]
+        values: [1.0e-2, 1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6]
       model_type:
         values: [resnet18, resnet34, resnet52]
   data:
