@@ -23,7 +23,7 @@ RESNET_DICT = {
 class EcallistoBase(LightningModule):
     def __init__(self, n_classes, class_weights, unnormalize_img, batch_size):
         super().__init__()
-        self.task = "binary" if n_classes == 1 else "multiclass"
+        self.task = "binary" if n_classes == 2 else "multiclass"
         self.recall = BinaryRecall()
         self.precision = BinaryPrecision()
         self.f1_score = BinaryF1Score()
@@ -31,12 +31,6 @@ class EcallistoBase(LightningModule):
         self.class_weights = class_weights
         self.loss_function = F.cross_entropy
         self.batch_size = batch_size
-
-        ## Test parameters
-        self.fp_examples = []
-        self.fn_examples = []
-        self.results = defaultdict(lambda: {"TP": 0, "TN": 0, "FP": 0, "FN": 0})
-        self.unnormalize_img = unnormalize_img
 
     @staticmethod
     def _calculate_prediction(y_hat):
@@ -47,19 +41,28 @@ class EcallistoBase(LightningModule):
     def training_step(self, batch, batch_idx):
         x, y, _, _ = batch
         y_hat = self(x)
-        if self.class_weights is not None:
-            loss = self.loss_function(y_hat, y, weight=self.class_weights.to(y.device))
-        else:
-            loss = self.loss_function(y_hat, y)
+        loss = self._loss(y_hat, y)
         self.log(
             "train_loss", loss, on_step=True, prog_bar=True, batch_size=self.batch_size
         )
         return loss
 
+    def _loss(self, y_hat, y):
+        if self.class_weights is not None:
+            loss = self.loss_function(y_hat, y, weight=self.class_weights.to(y.device))
+        else:
+            loss = self.loss_function(y_hat, y)
+        return loss
+
     def validation_step(self, batch, batch_idx):
         x, y, _, _ = batch
         y_hat = self(x)
-        loss = self.loss_function(y_hat, y)
+        # Metrics
+        self.precision(y_hat, y)
+        self.recall(y_hat, y)
+        self.f1_score(y_hat, y)
+        # Loss
+        loss = self._loss(y_hat, y)
         self.log(
             "val_loss",
             loss,
@@ -68,23 +71,11 @@ class EcallistoBase(LightningModule):
             on_epoch=True,
             on_step=False,
         )
-        _, preds = self._calculate_prediction(y_hat)
-        # Update confusion matrix and other metrics
-        self.confmat.update(preds, y)
-        self.precision.update(preds, y)
-        self.recall.update(preds, y)
-        self.f1_score.update(preds, y)
-
-    def on_validation_epoch_end(self):
-        # Calculate and log metrics
-        pre = self.precision.compute()
-        rec = self.recall.compute()
-        f1 = self.f1_score.compute()
-
+        
         # Log the computed metrics
         self.log(
             "val_precision",
-            pre,
+            self.precision,
             prog_bar=True,
             batch_size=self.batch_size,
             on_epoch=True,
@@ -92,7 +83,7 @@ class EcallistoBase(LightningModule):
         )
         self.log(
             "val_recall",
-            rec,
+            self.recall,
             prog_bar=True,
             batch_size=self.batch_size,
             on_epoch=True,
@@ -100,108 +91,58 @@ class EcallistoBase(LightningModule):
         )
         self.log(
             "val_f1",
-            f1,
+            self.f1_score,
             prog_bar=True,
             batch_size=self.batch_size,
             on_epoch=True,
             on_step=False,
         )
 
-        # Calculate conf matrix
-        confmat = self.confmat.compute()
-        fig, ax = plt.subplots()
-        sns.heatmap(confmat.cpu().numpy(), annot=True, fmt="g", ax=ax)
-        ax.set_xlabel("Predicted labels")
-        ax.set_ylabel("True labels")
-        ax.set_title("Confusion Matrix")
-
-        # Log the confusion matrix as an image to wandb
-        self.logger.experiment.log(
-            {"confusion_matrix": [wandb.Image(plt, caption="Val Confusion Matrix")]}
-        )
-
-        plt.close(fig)
-        # Reset metrics for the next epoch
-        self.precision.reset()
-        self.recall.reset()
-        self.f1_score.reset()
-        self.confmat.reset()
-
     def test_step(self, batch, batch_idx):
-        images, labels, antennas, _ = batch
-        y_hat = self(images)
-        _, preds = self._calculate_prediction(y_hat)
+            x, y, _, _ = batch
+            y_hat = self(x)
 
-        for img, label, pred, antenna in zip(images, labels, preds, antennas):
-            key = (antenna, label)
+            # Metrics
+            self.precision(y_hat, y)
+            self.recall(y_hat, y)
+            self.f1_score(y_hat, y)
 
-            if label != pred:
-                if label == 0:  # Assuming 0 is the negative class
-                    self.results[key]["FP"] += 1
-                    if len(self.fp_examples) < 15:
-                        self.fp_examples.append((img, antenna, label))
-                else:
-                    if len(self.fn_examples) < 15:
-                        self.fn_examples.append((img, antenna, label))
-
-        # Calculate metrics
-        y_hat = self(images)
-
-        # Update confusion matrix and other metrics
-        self.confmat.update(preds, labels)
-        self.precision.update(preds, labels)
-        self.recall.update(preds, labels)
-        self.f1_score.update(preds, labels)
-
-    def on_test_epoch_end(self):
-        # Calculate and log metrics
-        pre = self.precision.compute()
-        rec = self.recall.compute()
-        f1 = self.f1_score.compute()
-
-        # Log the computed metrics
-        self.log("test_precision", pre, prog_bar=True, batch_size=self.batch_size)
-        self.log("test_recall", rec, prog_bar=True, batch_size=self.batch_size)
-        self.log("test_f1", f1, prog_bar=True, batch_size=self.batch_size)
-
-        # Calculate conf matrix
-        confmat = self.confmat.compute()
-        fig, ax = plt.subplots()
-        sns.heatmap(confmat.cpu().numpy(), annot=True, fmt="g", ax=ax)
-        ax.set_xlabel("Predicted labels")
-        ax.set_ylabel("True labels")
-        ax.set_title("Confusion Matrix")
-
-        # Log the confusion matrix as an image to wandb
-        self.logger.experiment.log(
-            {"confusion_matrix": [wandb.Image(plt, caption="Test Confusion Matrix")]}
-        )
-
-        plt.close(fig)
-        # Reset metrics for the next epoch
-        self.precision.reset()
-        self.recall.reset()
-        self.f1_score.reset()
-        self.confmat.reset()
-        # Upload images
-        fp_images = [
-            wandb.Image(
-                to_pil_image(self.unnormalize_img(img[0], img[1])),
-                caption=f"Antenna: {img[1]}. Label: {img[2]}",
+            # Loss
+            loss = self._loss(y_hat, y)
+            self.log(
+                "test_loss",
+                loss,
+                prog_bar=True,
+                batch_size=self.batch_size,
+                on_epoch=True,
+                on_step=False,
             )
-            for img in self.fp_examples
-        ]
-        wandb.log({"False Positives": fp_images})
-
-        # Convert and log false negative examples
-        fn_images = [
-            wandb.Image(
-                to_pil_image(self.unnormalize_img(img[0], img[1])),
-                caption=f"Antenna: {img[1]}. Label: {img[2]}",
+            
+            # Log the computed metrics
+            self.log(
+                "test_precision",
+                self.precision,
+                prog_bar=True,
+                batch_size=self.batch_size,
+                on_epoch=True,
+                on_step=False,
             )
-            for img in self.fn_examples
-        ]
-        wandb.log({"False Negatives": fn_images})
+            self.log(
+                "test_recall",
+                self.recall,
+                prog_bar=True,
+                batch_size=self.batch_size,
+                on_epoch=True,
+                on_step=False,
+            )
+            self.log(
+                "test_f1",
+                self.f1_score,
+                prog_bar=True,
+                batch_size=self.batch_size,
+                on_epoch=True,
+                on_step=False,
+            )
 
     def on_train_end(self):
         # Log the best model to wandb at the end of training
