@@ -20,8 +20,10 @@ parameters:
         values: [True, False]
       reduce_non_burst:
         values: [True, False]
+      use_augmentation:
+        values: [True, False]
       freq_mask_param:
-        max: 100
+        max: 56
         min: 1
 
 

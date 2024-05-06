@@ -68,7 +68,7 @@ class EcallistoDataset(Dataset):
 
         if self.data_augm_transform is not None:
             example["image"] = self.data_augm_transform(
-                example["image"], mask_value=torch.median(example["image"])
+                example["image"], mask_value=torch.min(example["image"])
             )
 
         # Returns all
