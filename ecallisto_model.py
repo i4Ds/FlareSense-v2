@@ -17,9 +17,21 @@ RESNET_DICT = {
     "resnet52": models.resnet50,
 }
 
+OPTIMIZERS = {
+    "adam": torch.optim.Adam,
+    "adamw": torch.optim.AdamW,
+}
+
 
 class EcallistoBase(LightningModule):
-    def __init__(self, n_classes, class_weights, batch_size):
+    def __init__(
+        self,
+        n_classes,
+        class_weights,
+        batch_size,
+        optimizer_name,
+        learning_rate,
+    ):
         super().__init__()
         self.recall = Recall(num_classes=n_classes, task="multiclass", average="macro")
         self.precision = Precision(
@@ -32,6 +44,10 @@ class EcallistoBase(LightningModule):
         self.class_weights = class_weights
         self.loss_function = F.cross_entropy
         self.batch_size = batch_size
+
+        # Optimizer
+        self.optimizer_name = optimizer_name
+        self.learning_rate = learning_rate
 
     @staticmethod
     def calculate_prediction(y_hat):
@@ -172,37 +188,10 @@ class EcallistoBase(LightningModule):
         if best_model_path:
             wandb.log_artifact(best_model_path, type="model", name="best_model")
 
-
-class EfficientNet(EcallistoBase):
-    def __init__(
-        self,
-        n_classes,
-        class_weights=None,
-        learnig_rate=None,
-        dropout=None,
-        batch_size=None,
-        model_weights=None,
-    ):
-        super().__init__(
-            n_classes=n_classes,
-            class_weights=class_weights,
-            batch_size=batch_size,
-        )
-        self.efficient_net = models.efficientnet_v2_s(
-            weights=model_weights,
-            dropout=dropout,
-            num_classes=n_classes,
-        )
-        self.learnig_rate = learnig_rate
-
-    def forward(self, x):
-        # Convert grayscale image to 3-channel image if it's not already
-        if x.size(1) == 1:
-            x = x.repeat(1, 3, 1, 1)
-        return self.efficient_net(x)
-
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.learnig_rate)
+        return OPTIMIZERS[self.optimizer_name](
+            params=self.parameters(), lr=self.learning_rate, eps=1e-6
+        )
 
 
 class ResNet(EcallistoBase):
@@ -210,8 +199,9 @@ class ResNet(EcallistoBase):
         self,
         n_classes,
         resnet_type,
+        optimizer_name,
+        learning_rate,
         class_weights=None,
-        learnig_rate=None,
         batch_size=None,
         model_weights=None,
     ):
@@ -219,20 +209,18 @@ class ResNet(EcallistoBase):
             n_classes=n_classes,
             class_weights=class_weights,
             batch_size=batch_size,
+            optimizer_name=optimizer_name,
+            learning_rate=learning_rate,
         )
         self.resnet = RESNET_DICT[resnet_type](
             weights=model_weights, num_classes=n_classes
         )
-        self.learnig_rate = learnig_rate
 
     def forward(self, x):
         # ResNet-18 expects 3-channel input, so ensure the input x is 3-channel
         if x.size(1) == 1:
             x = x.repeat(1, 3, 1, 1)
         return self.resnet(x)
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.learnig_rate)
 
 
 def create_normalize_function(antenna_stats, simple):

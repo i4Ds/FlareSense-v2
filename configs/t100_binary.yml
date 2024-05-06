@@ -8,6 +8,7 @@ general:
 model:
   model_type: resnet18
   input_size: [224, 244]
+  optimizer_name: adamw
   lr: 1.0e-4
 
 data:

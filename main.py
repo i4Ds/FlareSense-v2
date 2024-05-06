@@ -149,7 +149,8 @@ if __name__ == "__main__":
         resnet_type=config["model"]["model_type"],
         class_weights=(cw if config["general"]["use_class_weights"] else None),
         batch_size=config["general"]["batch_size"],
-        learnig_rate=config["model"]["lr"],
+        optimizer_name=config["model"]["optimizer_name"],
+        learning_rate=config["model"]["lr"],
     )
 
     # Trainer
