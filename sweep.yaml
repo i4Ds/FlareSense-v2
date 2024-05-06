@@ -10,7 +10,6 @@ parameters:
   model:
     parameters:
       lr:
-      distribution: uniform
         max: 1.0e-1
         min: 1.0e-7
       model_type:
@@ -22,7 +21,6 @@ parameters:
       reduce_non_burst:
         values: [True, False]
       freq_mask_param:
-        distribution: uniform
         max: 100
         min: 1
 

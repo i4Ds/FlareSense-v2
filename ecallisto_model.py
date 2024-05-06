@@ -6,6 +6,7 @@ from torchmetrics import ConfusionMatrix
 from torchmetrics.classification import Recall, Precision, F1Score
 from torchvision import models
 import wandb
+
 # Visualization
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -20,10 +21,14 @@ RESNET_DICT = {
 class EcallistoBase(LightningModule):
     def __init__(self, n_classes, class_weights, batch_size):
         super().__init__()
-        self.recall = Recall(num_classes=n_classes, task='multiclass', average='macro')
-        self.precision = Precision(num_classes=n_classes, task='multiclass', average='macro')
-        self.f1_score = F1Score(num_classes=n_classes, task='multiclass', average='macro')
-        self.confmat = ConfusionMatrix(num_classes=n_classes, task='multiclass')
+        self.recall = Recall(num_classes=n_classes, task="multiclass", average="macro")
+        self.precision = Precision(
+            num_classes=n_classes, task="multiclass", average="macro"
+        )
+        self.f1_score = F1Score(
+            num_classes=n_classes, task="multiclass", average="macro"
+        )
+        self.confmat = ConfusionMatrix(num_classes=n_classes, task="multiclass")
         self.class_weights = class_weights
         self.loss_function = F.cross_entropy
         self.batch_size = batch_size
@@ -39,7 +44,12 @@ class EcallistoBase(LightningModule):
         y_hat = self(x)
         loss = self._loss(y_hat, y)
         self.log(
-            "train_loss", loss, on_step=True, prog_bar=True, batch_size=self.batch_size, on_epoch=False
+            "train_loss",
+            loss,
+            on_step=True,
+            prog_bar=True,
+            batch_size=self.batch_size,
+            on_epoch=False,
         )
         return loss
 
@@ -67,7 +77,7 @@ class EcallistoBase(LightningModule):
             on_epoch=True,
             on_step=False,
         )
-        
+
         # Log the computed metrics
         self.log(
             "val_precision",
@@ -95,66 +105,66 @@ class EcallistoBase(LightningModule):
         )
 
     def test_step(self, batch, batch_idx):
-            x, y, _, _ = batch
-            y_hat = self(x)
+        x, y, _, _ = batch
+        y_hat = self(x)
 
-            # Metrics
-            self.precision(y_hat, y)
-            self.recall(y_hat, y)
-            self.f1_score(y_hat, y)
-            self.confmat(y_hat, y)
+        # Metrics
+        self.precision(y_hat, y)
+        self.recall(y_hat, y)
+        self.f1_score(y_hat, y)
+        self.confmat(y_hat, y)
 
-            # Loss
-            loss = self._loss(y_hat, y)
-            self.log(
-                "test_loss",
-                loss,
-                prog_bar=True,
-                batch_size=self.batch_size,
-                on_epoch=True,
-                on_step=False,
-            )
-            
-            # Log the computed metrics
-            self.log(
-                "test_precision",
-                self.precision,
-                prog_bar=True,
-                batch_size=self.batch_size,
-                on_epoch=True,
-                on_step=False,
-            )
-            self.log(
-                "test_recall",
-                self.recall,
-                prog_bar=True,
-                batch_size=self.batch_size,
-                on_epoch=True,
-                on_step=False,
-            )
-            self.log(
-                "test_f1",
-                self.f1_score,
-                prog_bar=True,
-                batch_size=self.batch_size,
-                on_epoch=True,
-                on_step=False,
-            )
+        # Loss
+        loss = self._loss(y_hat, y)
+        self.log(
+            "test_loss",
+            loss,
+            prog_bar=True,
+            batch_size=self.batch_size,
+            on_epoch=True,
+            on_step=False,
+        )
 
-            # Log the confusion matrix
-            confmat = self.confmat.compute()
-            fig, ax = plt.subplots()
-            sns.heatmap(confmat.cpu().numpy(), annot=True, fmt="g", ax=ax)
-            ax.set_xlabel("Predicted labels")
-            ax.set_ylabel("True labels")
-            ax.set_title("Confusion Matrix")
+        # Log the computed metrics
+        self.log(
+            "test_precision",
+            self.precision,
+            prog_bar=True,
+            batch_size=self.batch_size,
+            on_epoch=True,
+            on_step=False,
+        )
+        self.log(
+            "test_recall",
+            self.recall,
+            prog_bar=True,
+            batch_size=self.batch_size,
+            on_epoch=True,
+            on_step=False,
+        )
+        self.log(
+            "test_f1",
+            self.f1_score,
+            prog_bar=True,
+            batch_size=self.batch_size,
+            on_epoch=True,
+            on_step=False,
+        )
 
-            # Log the confusion matrix as an image to wandb
-            self.logger.experiment.log(
-                {"confusion_matrix": [wandb.Image(plt, caption="Test Confusion Matrix")]}
-            )
+        # Log the confusion matrix
+        confmat = self.confmat.compute()
+        fig, ax = plt.subplots()
+        sns.heatmap(confmat.cpu().numpy(), annot=True, fmt="g", ax=ax)
+        ax.set_xlabel("Predicted labels")
+        ax.set_ylabel("True labels")
+        ax.set_title("Confusion Matrix")
 
-            plt.close(fig)
+        # Log the confusion matrix as an image to wandb
+        self.logger.experiment.log(
+            {"confusion_matrix": [wandb.Image(plt, caption="Test Confusion Matrix")]}
+        )
+
+        plt.close(fig)
 
     def on_train_end(self):
         # Log the best model to wandb at the end of training
@@ -238,7 +248,7 @@ def create_normalize_function(antenna_stats, simple):
         return normalized_image
 
     def simple_normalize(image, antenna):
-        return image / 255.0
+        return image / 254.0
 
     return simple_normalize if simple else normalize
 

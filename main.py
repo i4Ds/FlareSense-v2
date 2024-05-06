@@ -51,6 +51,7 @@ if __name__ == "__main__":
     wandb_logger = WandbLogger(log_model=False)  # Push it only on training end.
 
     # Overwrite config with wandb config (for sweep etc.)
+    # And to make sure that we indeed pass all correct parameters.
     del config
     config = wandb.config
 
@@ -76,7 +77,9 @@ if __name__ == "__main__":
         ]
     )
     if config["data"]["use_augmentation"]:
-        data_augm_transform = FrequencyMasking(freq_mask_param=config["data"]["freq_mask_param"])
+        data_augm_transform = FrequencyMasking(
+            freq_mask_param=config["data"]["freq_mask_param"]
+        )
 
     else:
         data_augm_transform = None
@@ -155,7 +158,7 @@ if __name__ == "__main__":
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
         enable_progress_bar=False,
-        val_check_interval=0.25, # 4x during an epoch.
+        val_check_interval=0.25,  # 4x during an epoch.
     )
 
     # Train

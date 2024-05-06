@@ -5,6 +5,9 @@ import torch
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import pil_to_tensor
+import torch
+from torchvision import transforms
+import os
 
 
 # Dataset
@@ -25,11 +28,6 @@ class EcallistoDataset(Dataset):
         example["image"] = pil_to_tensor(example["image"]).float()
         example["label"] = torch.tensor(example["label"])
         return example
-
-    @staticmethod
-    def scale(img, max_value=254):
-        img = torch.div(img, max_value)
-        return img
 
     def __len__(self):
         """Function to return the number of records in the dataset"""
@@ -59,7 +57,7 @@ class EcallistoDataset(Dataset):
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
         example = self.to_torch_tensor(self.data[index])
-        
+
         # Base transform
         example["image"] = self.base_transform(example["image"])
 
@@ -67,9 +65,11 @@ class EcallistoDataset(Dataset):
         example["image"] = self.normalization_transform(
             example["image"], example["antenna"]
         )
-        
+
         if self.data_augm_transform is not None:
-            example["image"] = self.data_augm_transform(example["image"], mask_value=torch.min(example["image"]))
+            example["image"] = self.data_augm_transform(
+                example["image"], mask_value=torch.median(example["image"])
+            )
 
         # Returns all
         return (
@@ -78,6 +78,23 @@ class EcallistoDataset(Dataset):
             example["antenna"],
             example["datetime"],
         )
+
+    def save_image(self, image_tensor, antenna, datetime):
+        # Create a directory to save the image
+        save_dir = "saved_images"
+        os.makedirs(save_dir, exist_ok=True)
+
+        # Convert datetime to a filename-friendly format
+        datetime_str = datetime.replace(":", "-").replace(" ", "_")
+
+        # Define the filename
+        filename = f"{antenna}_{datetime_str}.png"
+        file_path = os.path.join(save_dir, filename)
+
+        # Convert the tensor to a PIL Image and save it
+        image = transforms.ToPILImage()(image_tensor)
+        image.save(file_path)
+        print(f"Image saved to {file_path}")
 
 
 class EcallistoDatasetBinary(EcallistoDataset):
@@ -121,11 +138,6 @@ class EcallistoDatasetBinary(EcallistoDataset):
 def to_torch_tensor(example):
     # Convert the PIL image to a tensor
     example["image"] = pil_to_tensor(example["image"])
-    return example
-
-
-def scale(example, max_value=255):
-    example["image"] = torch.div(example["image"], max_value)
     return example
 
 
