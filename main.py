@@ -2,7 +2,7 @@
 import argparse
 import torch
 import yaml
-from datasets import DatasetDict, load_dataset
+from datasets import load_dataset
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
@@ -76,12 +76,8 @@ if __name__ == "__main__":
         ]
     )
     if config["data"]["use_augmentation"]:
-        data_augm_transform = Compose(
-            [
-                FrequencyMasking(freq_mask_param=config["data"]["freq_mask_param"]),
-                TimeMasking(time_mask_param=config["data"]["time_mask_param"]),
-            ]
-        )
+        data_augm_transform = FrequencyMasking(freq_mask_param=config["data"]["freq_mask_param"])
+
     else:
         data_augm_transform = None
 
@@ -151,7 +147,6 @@ if __name__ == "__main__":
         class_weights=(cw if config["general"]["use_class_weights"] else None),
         batch_size=config["general"]["batch_size"],
         learnig_rate=config["model"]["lr"],
-        unnormalize_img=unnormalize_img,
     )
 
     # Trainer
@@ -160,7 +155,7 @@ if __name__ == "__main__":
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
         enable_progress_bar=False,
-        val_check_interval=200,
+        val_check_interval=0.25, # 4x during an epoch.
     )
 
     # Train

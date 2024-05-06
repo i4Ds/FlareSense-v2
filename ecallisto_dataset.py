@@ -59,17 +59,17 @@ class EcallistoDataset(Dataset):
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
         example = self.to_torch_tensor(self.data[index])
-
+        
         # Base transform
         example["image"] = self.base_transform(example["image"])
-
-        if self.data_augm_transform is not None:
-            example["image"] = self.data_augm_transform(example["image"])
 
         # Normalization
         example["image"] = self.normalization_transform(
             example["image"], example["antenna"]
         )
+        
+        if self.data_augm_transform is not None:
+            example["image"] = self.data_augm_transform(example["image"], mask_value=torch.min(example["image"]))
 
         # Returns all
         return (

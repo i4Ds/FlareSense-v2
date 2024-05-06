@@ -1,17 +1,14 @@
-# Visualization
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 # Modeling
 import torch
 import torch.nn.functional as F
 from pytorch_lightning import LightningModule
 from torchmetrics import ConfusionMatrix
-from torchmetrics.classification import BinaryPrecision, BinaryF1Score, BinaryRecall
+from torchmetrics.classification import Recall, Precision, F1Score
 from torchvision import models
-from collections import defaultdict
 import wandb
-from torchvision.transforms.functional import to_pil_image
+# Visualization
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 RESNET_DICT = {
     "resnet18": models.resnet18,
@@ -21,19 +18,18 @@ RESNET_DICT = {
 
 
 class EcallistoBase(LightningModule):
-    def __init__(self, n_classes, class_weights, unnormalize_img, batch_size):
+    def __init__(self, n_classes, class_weights, batch_size):
         super().__init__()
-        self.task = "binary" if n_classes == 2 else "multiclass"
-        self.recall = BinaryRecall()
-        self.precision = BinaryPrecision()
-        self.f1_score = BinaryF1Score()
-        self.confmat = ConfusionMatrix(task=self.task, num_classes=n_classes)
+        self.recall = Recall(num_classes=n_classes, task='multiclass', average='macro')
+        self.precision = Precision(num_classes=n_classes, task='multiclass', average='macro')
+        self.f1_score = F1Score(num_classes=n_classes, task='multiclass', average='macro')
+        self.confmat = ConfusionMatrix(num_classes=n_classes, task='multiclass')
         self.class_weights = class_weights
         self.loss_function = F.cross_entropy
         self.batch_size = batch_size
 
     @staticmethod
-    def _calculate_prediction(y_hat):
+    def calculate_prediction(y_hat):
         probabilities = F.softmax(y_hat, dim=1).squeeze()
         preds = torch.where(probabilities[:, 1] > 0.5, 1, 0)
         return probabilities, preds
@@ -43,7 +39,7 @@ class EcallistoBase(LightningModule):
         y_hat = self(x)
         loss = self._loss(y_hat, y)
         self.log(
-            "train_loss", loss, on_step=True, prog_bar=True, batch_size=self.batch_size
+            "train_loss", loss, on_step=True, prog_bar=True, batch_size=self.batch_size, on_epoch=False
         )
         return loss
 
@@ -106,6 +102,7 @@ class EcallistoBase(LightningModule):
             self.precision(y_hat, y)
             self.recall(y_hat, y)
             self.f1_score(y_hat, y)
+            self.confmat(y_hat, y)
 
             # Loss
             loss = self._loss(y_hat, y)
@@ -144,6 +141,21 @@ class EcallistoBase(LightningModule):
                 on_step=False,
             )
 
+            # Log the confusion matrix
+            confmat = self.confmat.compute()
+            fig, ax = plt.subplots()
+            sns.heatmap(confmat.cpu().numpy(), annot=True, fmt="g", ax=ax)
+            ax.set_xlabel("Predicted labels")
+            ax.set_ylabel("True labels")
+            ax.set_title("Confusion Matrix")
+
+            # Log the confusion matrix as an image to wandb
+            self.logger.experiment.log(
+                {"confusion_matrix": [wandb.Image(plt, caption="Test Confusion Matrix")]}
+            )
+
+            plt.close(fig)
+
     def on_train_end(self):
         # Log the best model to wandb at the end of training
         best_model_path = self.trainer.checkpoint_callback.best_model_path
@@ -157,7 +169,6 @@ class EfficientNet(EcallistoBase):
         n_classes,
         class_weights=None,
         learnig_rate=None,
-        unnormalize_img=None,
         dropout=None,
         batch_size=None,
         model_weights=None,
@@ -165,7 +176,6 @@ class EfficientNet(EcallistoBase):
         super().__init__(
             n_classes=n_classes,
             class_weights=class_weights,
-            unnormalize_img=unnormalize_img,
             batch_size=batch_size,
         )
         self.efficient_net = models.efficientnet_v2_s(
@@ -192,14 +202,12 @@ class ResNet(EcallistoBase):
         resnet_type,
         class_weights=None,
         learnig_rate=None,
-        unnormalize_img=None,
         batch_size=None,
         model_weights=None,
     ):
         super().__init__(
             n_classes=n_classes,
             class_weights=class_weights,
-            unnormalize_img=unnormalize_img,
             batch_size=batch_size,
         )
         self.resnet = RESNET_DICT[resnet_type](
