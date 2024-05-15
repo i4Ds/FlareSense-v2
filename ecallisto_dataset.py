@@ -28,7 +28,7 @@ class EcallistoDataset(Dataset):
         # Convert the example to a torch tensor
         if "file_path" in example:
             example["image"] = torch.from_numpy(
-                pd.read_parquet(example["image_path"]).values
+                pd.read_parquet(example["file_path"]).values
             ).float()
         else:
             example["image"] = pil_to_tensor(example["image"]).float()
