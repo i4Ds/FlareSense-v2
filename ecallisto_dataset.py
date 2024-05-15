@@ -8,24 +8,30 @@ from torchvision.transforms.functional import pil_to_tensor
 import torch
 from torchvision import transforms
 import os
+import pandas as pd
 
 
 # Dataset
 class EcallistoDataset(Dataset):
     def __init__(
-        self, dataset, base_transform, normalization_transform, data_augm_transform=None
+        self, dataset, resize_func, normalization_transform, data_augm_transform=None
     ):
         super().__init__()
         self.data = dataset
         self.data_augm_transform = data_augm_transform
-        self.base_transform = base_transform
+        self.resize_func = resize_func
         self.normalization_transform = normalization_transform
         self.dataset_label_weight = self.get_dataset_label_weight()
 
     @staticmethod
     def to_torch_tensor(example):
-        # Convert the example to a torch tensor.
-        example["image"] = pil_to_tensor(example["image"]).float()
+        # Convert the example to a torch tensor
+        if "file_path" in example:
+            example["image"] = torch.from_numpy(
+                pd.read_parquet(example["image_path"]).values
+            ).float()
+        else:
+            example["image"] = pil_to_tensor(example["image"]).float()
         example["label"] = torch.tensor(example["label"])
         return example
 
@@ -58,18 +64,22 @@ class EcallistoDataset(Dataset):
         """Function to return samples corresponding to a given index from a dataset"""
         example = self.to_torch_tensor(self.data[index])
 
-        # Base transform
-        example["image"] = self.base_transform(example["image"])
+        if self.data_augm_transform is not None:
+            example["image"] = self.data_augm_transform(
+                example["image"], mask_value=torch.min(example["image"])
+            )
 
         # Normalization
         example["image"] = self.normalization_transform(
             example["image"], example["antenna"]
         )
 
+        # Resize
+        example["image"] = self.resize_func(example["image"])
+
+        # Data aug
         if self.data_augm_transform is not None:
-            example["image"] = self.data_augm_transform(
-                example["image"], mask_value=torch.min(example["image"])
-            )
+            example["image"] = self.data_augm_transform(example["image"])
 
         # Returns all
         return (
@@ -101,14 +111,14 @@ class EcallistoDatasetBinary(EcallistoDataset):
     def __init__(
         self,
         dataset,
-        base_transform,
+        resize_func,
         normalization_transform,
         data_augm_transform=None,
     ):
         # Initialize the parent class
         super().__init__(
             dataset,
-            base_transform,
+            resize_func,
             normalization_transform,
             data_augm_transform=data_augm_transform,
         )
@@ -135,10 +145,69 @@ class EcallistoDatasetBinary(EcallistoDataset):
         return cw
 
 
-def to_torch_tensor(example):
-    # Convert the PIL image to a tensor
-    example["image"] = pil_to_tensor(example["image"])
-    return example
+class CustomSpecAugment:
+    def __init__(self, frequency_masking_para, method="max"):
+        self.frequency_masking_para = frequency_masking_para
+        self.method = method
+
+    def __call__(self, spectrogram):
+        # Calculate per-row padding values based on the specified method
+        if self.method == "max":
+            padding_values = torch.max(spectrogram, dim=1).values
+        elif self.method == "min":
+            padding_values = torch.min(spectrogram, dim=1).values
+        elif self.method == "median":
+            padding_values = torch.median(spectrogram, dim=1).values
+        elif self.method == "mean":
+            padding_values = torch.mean(spectrogram, dim=1).values
+        else:
+            raise ValueError(
+                "Invalid method parameter. Choose from 'max', 'min', 'median', or 'mean'."
+            )
+
+        # Apply frequency masking
+        spectrogram = self.frequency_mask(spectrogram, padding_values)
+        return spectrogram
+
+    def frequency_mask(self, spectrogram, padding_values):
+        num_mel_channels = spectrogram.size(0)
+        mask_param = torch.randint(0, self.frequency_masking_para, (1,)).item()
+
+        f = torch.randint(0, num_mel_channels - mask_param, (1,)).item()
+        mask_value = padding_values[f]
+        spectrogram[f : f + mask_param, :] = mask_value
+        return spectrogram
+
+
+def remove_background(spectrogram):
+    # Calculate the median of each row
+    median_values = torch.median(spectrogram, dim=1).values
+
+    # Subtract the median from each row
+    background_removed = spectrogram - median_values[:, None]
+
+    return background_removed
+
+
+def global_min_max_scale(spectrogram):
+    # Calculate the global minimum and maximum
+    min_value = torch.min(spectrogram)
+    max_value = torch.max(spectrogram)
+
+    # Apply global Min-Max scaling
+    scaled_spectrogram = (spectrogram - min_value) / (max_value - min_value)
+
+    return scaled_spectrogram
+
+
+def preprocess_spectrogram(spectrogram):
+    # Remove background
+    spectrogram = remove_background(spectrogram)
+
+    # Apply global Min-Max scaling
+    spectrogram = global_min_max_scale(spectrogram)
+
+    return spectrogram
 
 
 def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):
@@ -174,6 +243,7 @@ def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):
     balanced_dataset = dataset.select(final_indices)
 
     return balanced_dataset
+
 
 def filter_antennas(dataset, antenna_list):
     """

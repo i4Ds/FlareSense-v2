@@ -8,4 +8,4 @@
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 
-wandb agent vincenzo-timmel/FlareSense-v2/f5632fv0
+python main.py --config configs/t200_filtered.yml

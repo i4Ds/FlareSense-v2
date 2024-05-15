@@ -14,12 +14,12 @@ import wandb
 from ecallisto_dataset import (
     randomly_reduce_class_samples,
     filter_antennas,
+    CustomSpecAugment,
     EcallistoDatasetBinary,
+    preprocess_spectrogram,
 )
 from ecallisto_model import (
     ResNet,
-    create_normalize_function,
-    create_unnormalize_function,
 )
 
 
@@ -71,21 +71,21 @@ if __name__ == "__main__":
         )
 
     # Filter by certain antennas
-    if len(config['data']['antennas']) > 0:
-        ds_train = filter_antennas(ds_train, config['data']['antennas'])
-        ds_val = filter_antennas(ds_val, config['data']['antennas'])
+    if len(config["data"]["antennas"]) > 0:
+        ds_train = filter_antennas(ds_train, config["data"]["antennas"])
+        ds_val = filter_antennas(ds_val, config["data"]["antennas"])
     size = tuple(config["model"]["input_size"])
 
-
     # Transforms
-    base_transform = Compose(
+    resize_func = Compose(
         [
             Resize(size),  # Resize the image
         ]
     )
     if config["data"]["use_augmentation"]:
-        data_augm_transform = FrequencyMasking(
-            freq_mask_param=config["data"]["freq_mask_param"]
+        data_augm_transform = CustomSpecAugment(
+            freq_mask_param=config["data"]["freq_mask_param"],
+            method=config["data"]["freq_mask_method"],
         )
 
     else:
@@ -94,21 +94,18 @@ if __name__ == "__main__":
     # Define normalization
     with open("antenna_stats.yaml", "r") as file:
         antenna_stats = yaml.safe_load(file)
-    normalize_transform = create_normalize_function(
-        antenna_stats=antenna_stats, simple=config["data"]["simple_normalization"]
-    )
 
     # Data Loader
     ds_train = EcallistoDatasetBinary(
         ds_train,
-        base_transform=base_transform,
+        resize_func=resize_func,
         data_augm_transform=data_augm_transform,
-        normalization_transform=normalize_transform,
+        normalization_transform=preprocess_spectrogram,
     )
     ds_valid = EcallistoDatasetBinary(
         ds_val,
-        base_transform=base_transform,
-        normalization_transform=normalize_transform,
+        resize_func=resize_func,
+        normalization_transform=preprocess_spectrogram,
     )
 
     # Create Data loader
@@ -177,11 +174,11 @@ if __name__ == "__main__":
     ## Evaluate
     # Create test set
     ds_test = load_dataset(config["data"]["test_path"], split="test")
-    
-    # Filter 
-    if len(config['data']['antennas']) > 0:
-        ds_test = filter_antennas(ds_test, config['data']['antennas'])
-        
+
+    # Filter
+    if len(config["data"]["antennas"]) > 0:
+        ds_test = filter_antennas(ds_test, config["data"]["antennas"])
+
     ds_test = EcallistoDatasetBinary(
         ds_test,
         base_transform=base_transform,
