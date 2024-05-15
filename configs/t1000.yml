@@ -20,5 +20,5 @@ data:
   train_class_to_reduce: 0
   reduction_fraction: 0.2
   use_augmentation: False
-  freq_mask_param: 30
+  frequency_masking_para: 30
   freq_mask_method: max

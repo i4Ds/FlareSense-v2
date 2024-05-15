@@ -9,6 +9,8 @@ import torch
 from torchvision import transforms
 import os
 import pandas as pd
+import torch
+import torch.nn.functional as F
 
 
 # Dataset
@@ -28,7 +30,9 @@ class EcallistoDataset(Dataset):
         # Convert the example to a torch tensor
         if "file_path" in example:
             example["image"] = torch.from_numpy(
-                pd.read_parquet(example["file_path"]).values
+                pd.read_parquet(
+                    example["file_path"]
+                ).values.T  # So that plotting it directly is the correct way around
             ).float()
         else:
             example["image"] = pil_to_tensor(example["image"]).float()
@@ -62,24 +66,26 @@ class EcallistoDataset(Dataset):
 
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
-        example = self.to_torch_tensor(self.data[index])
+        try:
+            example = self.to_torch_tensor(self.data[index])
+        except:
+            print(self.data[index])
+            raise Exception
 
         if self.data_augm_transform is not None:
-            example["image"] = self.data_augm_transform(
-                example["image"], mask_value=torch.min(example["image"])
-            )
+            example["image"] = self.data_augm_transform(example["image"])
+        print(example["image"].shape)
 
         # Normalization
-        example["image"] = self.normalization_transform(
-            example["image"], example["antenna"]
-        )
-
+        example["image"] = self.normalization_transform(example["image"])
+        print(example["image"].shape)
         # Resize
         example["image"] = self.resize_func(example["image"])
-
+        print(example["image"].shape)
         # Data aug
         if self.data_augm_transform is not None:
             example["image"] = self.data_augm_transform(example["image"])
+            print(example["image"].shape)
 
         # Returns all
         return (
@@ -177,6 +183,51 @@ class CustomSpecAugment:
         mask_value = padding_values[f]
         spectrogram[f : f + mask_param, :] = mask_value
         return spectrogram
+
+
+def custom_resize_max(spectrogram, target_size):
+    """
+    Resize the spectrogram by aggregating using the max value within each window.
+
+    Args:
+        spectrogram (torch.Tensor): Input spectrogram of shape (C, H, W) or (H, W).
+        target_size (tuple): Desired output size (target_height, target_width).
+
+    Returns:
+        torch.Tensor: Resized spectrogram.
+    """
+    if spectrogram.ndim == 2:
+        spectrogram = spectrogram.unsqueeze(0)  # Add channel dimension if missing
+
+    _, H, W = spectrogram.shape
+    target_H, target_W = target_size
+
+    # Calculate the size of the pooling windows
+    kernel_size_H = max(1, H // target_H)
+    kernel_size_W = max(1, W // target_W)
+
+    # Calculate the stride to ensure the output size matches the target size
+    stride_H = max(1, H // target_H)
+    stride_W = max(1, W // target_W)
+
+    # Apply max pooling
+    pooled_spectrogram = F.max_pool2d(
+        spectrogram,
+        kernel_size=(kernel_size_H, kernel_size_W),
+        stride=(stride_H, stride_W),
+    )
+
+    # If the output dimensions do not match the target size, apply padding or cropping
+    if pooled_spectrogram.shape[1] < target_H or pooled_spectrogram.shape[2] < target_W:
+        # Calculate required padding
+        pad_H = target_H - pooled_spectrogram.shape[1]
+        pad_W = target_W - pooled_spectrogram.shape[2]
+        padded_spectrogram = F.pad(
+            pooled_spectrogram, (0, pad_W, 0, pad_H), mode="replicate"
+        )
+        pooled_spectrogram = padded_spectrogram[:, :target_H, :target_W]
+
+    return pooled_spectrogram.squeeze(0)  # Remove the channel dimension if it was added
 
 
 def remove_background(spectrogram):

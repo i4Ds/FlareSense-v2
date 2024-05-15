@@ -84,7 +84,7 @@ if __name__ == "__main__":
     )
     if config["data"]["use_augmentation"]:
         data_augm_transform = CustomSpecAugment(
-            freq_mask_param=config["data"]["freq_mask_param"],
+            frequency_masking_para=config["data"]["frequency_masking_para"],
             method=config["data"]["freq_mask_method"],
         )
 
@@ -147,7 +147,6 @@ if __name__ == "__main__":
 
     # Setup Model
     cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
-    unnormalize_img = create_unnormalize_function(antenna_stats)
     model = ResNet(
         n_classes=2,  # Binary
         resnet_type=config["model"]["model_type"],
@@ -181,8 +180,8 @@ if __name__ == "__main__":
 
     ds_test = EcallistoDatasetBinary(
         ds_test,
-        base_transform=base_transform,
-        normalization_transform=normalize_transform,
+        resize_func=resize_func,
+        normalization_transform=preprocess_spectrogram,
     )
     # Create dataloader
     test_dataloader = DataLoader(
