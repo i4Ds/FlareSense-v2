@@ -174,3 +174,22 @@ def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):
     balanced_dataset = dataset.select(final_indices)
 
     return balanced_dataset
+
+def filter_antennas(dataset, antenna_list):
+    """
+    Filter out samples from a dataset based on a list of antenna names.
+
+    :param dataset: The dataset to process (assumed to be a Hugging Face dataset).
+    :param antenna_list: List of antenna names to keep.
+    :return: A new dataset with only the samples from the specified antennas.
+    """
+
+    # Get all indices for the specified antennas
+    selected_indices = [
+        i for i, antenna in enumerate(dataset["antenna"]) if antenna in antenna_list
+    ]
+
+    # Create and return the filtered dataset
+    filtered_dataset = dataset.select(selected_indices)
+
+    return filtered_dataset

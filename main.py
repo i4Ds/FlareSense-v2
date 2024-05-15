@@ -13,6 +13,7 @@ from torchvision.transforms import Compose, Resize
 import wandb
 from ecallisto_dataset import (
     randomly_reduce_class_samples,
+    filter_antennas,
     EcallistoDatasetBinary,
 )
 from ecallisto_model import (
@@ -68,7 +69,13 @@ if __name__ == "__main__":
             config["data"]["train_class_to_reduce"],
             config["data"]["reduction_fraction"],
         )
+
+    # Filter by certain antennas
+    if len(config['data']['antennas']) > 0:
+        ds_train = filter_antennas(ds_train, config['data']['antennas'])
+        ds_val = filter_antennas(ds_val, config['data']['antennas'])
     size = tuple(config["model"]["input_size"])
+
 
     # Transforms
     base_transform = Compose(
@@ -170,7 +177,11 @@ if __name__ == "__main__":
     ## Evaluate
     # Create test set
     ds_test = load_dataset(config["data"]["test_path"], split="test")
-
+    
+    # Filter 
+    if len(config['data']['antennas']) > 0:
+        ds_test = filter_antennas(ds_test, config['data']['antennas'])
+        
     ds_test = EcallistoDatasetBinary(
         ds_test,
         base_transform=base_transform,
