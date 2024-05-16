@@ -84,7 +84,7 @@ class EcallistoDataset(Dataset):
 
         # Returns all
         return (
-            example["image"],
+            example["image"].unsqueeze(0),  # Dummy batch size
             example["label"],
             example["antenna"],
             example["datetime"],
