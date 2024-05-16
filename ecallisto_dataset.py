@@ -69,23 +69,18 @@ class EcallistoDataset(Dataset):
         try:
             example = self.to_torch_tensor(self.data[index])
         except:
-            print(self.data[index])
             raise Exception
 
         if self.data_augm_transform is not None:
             example["image"] = self.data_augm_transform(example["image"])
-        print(example["image"].shape)
 
         # Normalization
         example["image"] = self.normalization_transform(example["image"])
-        print(example["image"].shape)
         # Resize
         example["image"] = self.resize_func(example["image"])
-        print(example["image"].shape)
         # Data aug
         if self.data_augm_transform is not None:
             example["image"] = self.data_augm_transform(example["image"])
-            print(example["image"].shape)
 
         # Returns all
         return (
