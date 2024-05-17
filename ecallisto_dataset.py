@@ -82,6 +82,9 @@ class EcallistoDataset(Dataset):
         # Data aug
         if self.data_augm_transform is not None:
             example["image"] = self.data_augm_transform(example["image"])
+
+        # Assert
+        assert torch.isnan(example["image"]).sum() == 0
         # Returns all
         return (
             example["image"].unsqueeze(0),
@@ -180,12 +183,15 @@ class CustomSpecAugment:
         return spectrogram
 
 
-def custom_resize(spectogram, target_size):
-    # Here, we resize only the height (frequency)
+def custom_resize(spectrogram, target_size):
+    spectrogram = custom_resize_height(spectrogram, target_size)
+    spectrogram = custom_resize_width_max(spectrogram, target_size)
+    return spectrogram
 
-    spectogram = Resize(target_size[0], spectogram.shape[1])(spectogram)
-    spectogram = custom_resize_width_max(spectogram, target_size)
-    return spectogram
+
+def custom_resize_height(spectrogram, target_size):
+    resize = Resize((target_size[0], spectrogram.shape[1]))
+    return resize(spectrogram.unsqueeze(0)).squeeze(0)
 
 
 def custom_resize_width_max(spectrogram, target_size):
@@ -205,7 +211,7 @@ def custom_resize_width_max(spectrogram, target_size):
 
     # Apply adaptive max pooling
     pooled_spectrogram = F.adaptive_max_pool2d(
-        spectrogram, output_size=(W, target_size[1])
+        spectrogram, output_size=(H, target_size[1])
     )
 
     return pooled_spectrogram.squeeze(0)  # Remove the channel dimension if it was added
