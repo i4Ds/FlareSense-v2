@@ -79,9 +79,7 @@ if __name__ == "__main__":
     # Transforms
     resize_func = Compose(
         [
-            lambda x: custom_resize(
-                x, tuple(config["model"]["input_size"])
-            ),  # Resize the image
+            lambda x: custom_resize(x, tuple(config["model"]["input_size"])),
         ]
     )
     if config["data"]["use_augmentation"]:
