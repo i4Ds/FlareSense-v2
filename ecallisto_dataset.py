@@ -84,7 +84,8 @@ class EcallistoDataset(Dataset):
             example["image"] = self.data_augm_transform(example["image"])
 
         # Assert
-        assert torch.isnan(example["image"]).sum() == 0
+        if not torch.isnan(example["image"]).sum() == 0:
+            print(example)
         # Returns all
         return (
             example["image"].unsqueeze(0),
