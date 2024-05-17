@@ -67,10 +67,7 @@ class EcallistoDataset(Dataset):
 
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
-        try:
-            example = self.to_torch_tensor(self.data[index])
-        except:
-            raise Exception
+        example = self.to_torch_tensor(self.data[index])
 
         # Normalization
         example["image"] = self.normalization_transform(example["image"])
