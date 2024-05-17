@@ -8,4 +8,4 @@
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 
-python main.py --config configs/t200_filtered.yml
+python main.py --config configs/t1000.yml

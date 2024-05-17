@@ -81,10 +81,9 @@ class EcallistoDataset(Dataset):
         # Data aug
         if self.data_augm_transform is not None:
             example["image"] = self.data_augm_transform(example["image"])
-
         # Returns all
         return (
-            example["image"].unsqueeze(0),  # Dummy batch size
+            example["image"].unsqueeze(0),
             example["label"],
             example["antenna"],
             example["datetime"],
@@ -194,33 +193,8 @@ def custom_resize_max(spectrogram, target_size):
     if spectrogram.ndim == 2:
         spectrogram = spectrogram.unsqueeze(0)  # Add channel dimension if missing
 
-    _, H, W = spectrogram.shape
-    target_H, target_W = target_size
-
-    # Calculate the size of the pooling windows
-    kernel_size_H = max(1, H // target_H)
-    kernel_size_W = max(1, W // target_W)
-
-    # Calculate the stride to ensure the output size matches the target size
-    stride_H = max(1, H // target_H)
-    stride_W = max(1, W // target_W)
-
-    # Apply max pooling
-    pooled_spectrogram = F.max_pool2d(
-        spectrogram,
-        kernel_size=(kernel_size_H, kernel_size_W),
-        stride=(stride_H, stride_W),
-    )
-
-    # If the output dimensions do not match the target size, apply padding or cropping
-    if pooled_spectrogram.shape[1] < target_H or pooled_spectrogram.shape[2] < target_W:
-        # Calculate required padding
-        pad_H = target_H - pooled_spectrogram.shape[1]
-        pad_W = target_W - pooled_spectrogram.shape[2]
-        padded_spectrogram = F.pad(
-            pooled_spectrogram, (0, pad_W, 0, pad_H), mode="replicate"
-        )
-        pooled_spectrogram = padded_spectrogram[:, :target_H, :target_W]
+    # Apply adaptive max pooling
+    pooled_spectrogram = F.adaptive_max_pool2d(spectrogram, output_size=target_size)
 
     return pooled_spectrogram.squeeze(0)  # Remove the channel dimension if it was added
 

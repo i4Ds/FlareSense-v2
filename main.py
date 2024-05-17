@@ -17,6 +17,7 @@ from ecallisto_dataset import (
     CustomSpecAugment,
     EcallistoDatasetBinary,
     preprocess_spectrogram,
+    custom_resize_max,
 )
 from ecallisto_model import (
     ResNet,
@@ -61,7 +62,7 @@ if __name__ == "__main__":
 
     # Create dataset
     ds_train = load_dataset(config["data"]["train_path"], split="train")
-    ds_val = load_dataset(config["data"]["train_path"], split="validation")
+    ds_valid = load_dataset(config["data"]["train_path"], split="validation")
 
     if config["data"]["reduce_non_burst"]:
         ds_train = randomly_reduce_class_samples(
@@ -73,13 +74,14 @@ if __name__ == "__main__":
     # Filter by certain antennas
     if len(config["data"]["antennas"]) > 0:
         ds_train = filter_antennas(ds_train, config["data"]["antennas"])
-        ds_val = filter_antennas(ds_val, config["data"]["antennas"])
-    size = tuple(config["model"]["input_size"])
+        ds_valid = filter_antennas(ds_valid, config["data"]["antennas"])
 
     # Transforms
     resize_func = Compose(
         [
-            Resize(size),  # Resize the image
+            lambda x: custom_resize_max(
+                x, tuple(config["model"]["input_size"])
+            ),  # Resize the image
         ]
     )
     if config["data"]["use_augmentation"]:
@@ -91,10 +93,6 @@ if __name__ == "__main__":
     else:
         data_augm_transform = None
 
-    # Define normalization
-    with open("antenna_stats.yaml", "r") as file:
-        antenna_stats = yaml.safe_load(file)
-
     # Data Loader
     ds_train = EcallistoDatasetBinary(
         ds_train,
@@ -103,16 +101,14 @@ if __name__ == "__main__":
         normalization_transform=preprocess_spectrogram,
     )
     ds_valid = EcallistoDatasetBinary(
-        ds_val,
+        ds_valid,
         resize_func=resize_func,
         normalization_transform=preprocess_spectrogram,
     )
 
-    # Create Data loader
-    sample_weights = (
-        ds_train.get_sample_weights()
-    )  # Never binary, because we also want to detect rare radio sunbursts.
+    # Incase we want to get a weighted random sampler (oversample rare classes)
     if config["general"]["use_random_sampler"]:
+        sample_weights = ds_train.get_sample_weights()
         sampler = WeightedRandomSampler(
             sample_weights, num_samples=len(sample_weights), replacement=True
         )
@@ -178,14 +174,14 @@ if __name__ == "__main__":
     if len(config["data"]["antennas"]) > 0:
         ds_test = filter_antennas(ds_test, config["data"]["antennas"])
 
-    ds_test = EcallistoDatasetBinary(
+    ds_t = EcallistoDatasetBinary(
         ds_test,
         resize_func=resize_func,
         normalization_transform=preprocess_spectrogram,
     )
     # Create dataloader
     test_dataloader = DataLoader(
-        ds_test,
+        ds_t,
         batch_size=config["general"]["batch_size"],
         num_workers=8,
         shuffle=True,  # To randomly log images
