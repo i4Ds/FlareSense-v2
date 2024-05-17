@@ -5,6 +5,7 @@ import torch
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import pil_to_tensor
+from torchvision.transforms import Resize
 import torch
 from torchvision import transforms
 import os
@@ -179,22 +180,33 @@ class CustomSpecAugment:
         return spectrogram
 
 
-def custom_resize_max(spectrogram, target_size):
+def custom_resize(spectogram, target_size):
+    # Here, we resize only the height (frequency)
+
+    spectogram = Resize(target_size[0], spectogram.shape[1])(spectogram)
+    spectogram = custom_resize_width_max(spectogram, target_size)
+    return spectogram
+
+
+def custom_resize_width_max(spectrogram, target_size):
     """
     Resize the spectrogram by aggregating using the max value within each window.
 
     Args:
-        spectrogram (torch.Tensor): Input spectrogram of shape (C, H, W) or (H, W).
+        spectrogram (torch.Tensor): Input spectrogram of shape (H, W).
         target_size (tuple): Desired output size (target_height, target_width).
 
     Returns:
         torch.Tensor: Resized spectrogram.
     """
-    if spectrogram.ndim == 2:
-        spectrogram = spectrogram.unsqueeze(0)  # Add channel dimension if missing
+    H, _ = spectrogram.shape
+
+    spectrogram = spectrogram.unsqueeze(0)  # Add channel dimension if missing
 
     # Apply adaptive max pooling
-    pooled_spectrogram = F.adaptive_max_pool2d(spectrogram, output_size=target_size)
+    pooled_spectrogram = F.adaptive_max_pool2d(
+        spectrogram, output_size=(W, target_size[1])
+    )
 
     return pooled_spectrogram.squeeze(0)  # Remove the channel dimension if it was added
 

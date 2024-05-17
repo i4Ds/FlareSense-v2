@@ -17,7 +17,7 @@ from ecallisto_dataset import (
     CustomSpecAugment,
     EcallistoDatasetBinary,
     preprocess_spectrogram,
-    custom_resize_max,
+    custom_resize,
 )
 from ecallisto_model import (
     ResNet,
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     # Transforms
     resize_func = Compose(
         [
-            lambda x: custom_resize_max(
+            lambda x: custom_resize(
                 x, tuple(config["model"]["input_size"])
             ),  # Resize the image
         ]
