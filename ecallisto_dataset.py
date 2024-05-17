@@ -30,11 +30,12 @@ class EcallistoDataset(Dataset):
     def to_torch_tensor(example):
         # Convert the example to a torch tensor
         if "file_path" in example:
-            example["image"] = torch.from_numpy(
-                pd.read_parquet(
-                    example["file_path"]
-                ).values.T  # So that plotting it directly is the correct way around
-            ).float()
+            # It's a parquet file, containing a DF
+            df = pd.read_parquet(example["file_path"])
+            df = df.dropna(how="all").dropna(
+                how="all", axis=1
+            )  # Some can be NANS, when instruments are updated or so.
+            example["image"] = torch.from_numpy(df.values.T).float()
         else:
             example["image"] = pil_to_tensor(example["image"]).float()
         example["label"] = torch.tensor(example["label"])
