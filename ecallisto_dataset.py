@@ -72,9 +72,6 @@ class EcallistoDataset(Dataset):
         except:
             raise Exception
 
-        if self.data_augm_transform is not None:
-            example["image"] = self.data_augm_transform(example["image"])
-
         # Normalization
         example["image"] = self.normalization_transform(example["image"])
         # Resize
