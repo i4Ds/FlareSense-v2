@@ -7,8 +7,8 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
-from torchaudio.transforms import FrequencyMasking, TimeMasking
-from torchvision.transforms import Compose, Resize
+import os
+from torchvision.transforms import Compose
 
 import wandb
 from ecallisto_dataset import (
@@ -28,7 +28,11 @@ if __name__ == "__main__":
     print(f"PyTorch version {torch.__version__}")
     # Check if CUDA is available
     if torch.cuda.is_available():
-        print(f"GPU is available: {torch.cuda.get_device_name(0)}")
+        device_id = torch.cuda.current_device()
+        device_name = torch.cuda.get_device_name(device_id)
+        print(
+            f"GPU is available: {device_name} (Device ID: {device_id}). I have {os.cpu_count()} cores available."
+        )
         device = "cuda"
     else:
         print("GPU is not available.")
@@ -117,7 +121,8 @@ if __name__ == "__main__":
         ds_train,
         sampler=sampler,
         batch_size=config["general"]["batch_size"],
-        num_workers=8,
+        num_workers=os.cpu_count(),
+        pin_memory=True,
         shuffle=False if sampler is not None else True,
         persistent_workers=True,
     )
@@ -125,7 +130,8 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(
         ds_valid,
         batch_size=config["general"]["batch_size"],
-        num_workers=8,
+        num_workers=os.cpu_count(),
+        pin_memory=True,
         shuffle=False,
         persistent_workers=True,
     )
@@ -155,7 +161,7 @@ if __name__ == "__main__":
         accelerator="gpu",
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
-        enable_progress_bar=False,
+        enable_progress_bar=True,
         val_check_interval=0.25,  # 4x during an epoch.
     )
 

@@ -32,9 +32,6 @@ class EcallistoDataset(Dataset):
         if "file_path" in example:
             # It's a parquet file, containing a DF
             df = pd.read_parquet(example["file_path"])
-            df = df.dropna(how="all").dropna(
-                how="all", axis=1
-            )  # Some can be NANS, when instruments are updated or so.
             example["image"] = torch.from_numpy(df.values.T).float()
         else:
             example["image"] = pil_to_tensor(example["image"]).float()
@@ -78,9 +75,6 @@ class EcallistoDataset(Dataset):
         if self.data_augm_transform is not None:
             example["image"] = self.data_augm_transform(example["image"])
 
-        # Assert
-        if not torch.isnan(example["image"]).sum() == 0:
-            print(example)
         # Returns all
         return (
             example["image"].unsqueeze(0),
