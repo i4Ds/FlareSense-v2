@@ -26,10 +26,6 @@ parameters:
       time_warp_w:
         max: 20
         min: 0
-  general:
-    parameters:
-      batch_size:
-        values: [32, 64, 128]
 
 
 command:
