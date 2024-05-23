@@ -19,10 +19,13 @@ parameters:
   data:
     parameters:
       freq_mask_method:
-        values: [min, max, mean, median]
+        values: [mean, random]
       freq_mask_param:
         max: 56
-        min: 1
+        min: 0
+      time_warp_w:
+        max: 20
+        min: 0
   general:
     parameters:
       batch_size:
