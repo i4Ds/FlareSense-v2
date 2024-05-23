@@ -15,6 +15,7 @@ from ecallisto_dataset import (
     randomly_reduce_class_samples,
     filter_antennas,
     CustomSpecAugment,
+    TimeWarpAugmenter,
     EcallistoDatasetBinary,
     preprocess_spectrogram,
     custom_resize,
@@ -87,9 +88,14 @@ if __name__ == "__main__":
         ]
     )
     if config["data"]["use_augmentation"]:
-        data_augm_transform = CustomSpecAugment(
-            frequency_masking_para=config["data"]["frequency_masking_para"],
-            method=config["data"]["freq_mask_method"],
+        data_augm_transform = Compose(
+            [
+                CustomSpecAugment(
+                    frequency_masking_para=config["data"]["frequency_masking_para"],
+                    method=config["data"]["freq_mask_method"],
+                ),
+                TimeWarpAugmenter(config["data"]["time_warp_w"]),
+            ]
         )
 
     else:

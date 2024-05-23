@@ -22,8 +22,6 @@ parameters:
         values: [True, False]
       reduce_non_burst:
         values: [True, False]
-      use_augmentation:
-        values: [True, False]
       freq_mask_param:
         max: 56
         min: 1
@@ -34,4 +32,4 @@ command:
   - ${interpreter}
   - ${program}
   - "--config"
-  - "configs/t100_binary.yml" #Insert your model here (do not push it, adapt it each time.)
+  - "configs/t1000.yml" #Insert your model here (do not push it, adapt it each time.)
