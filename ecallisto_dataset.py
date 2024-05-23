@@ -157,7 +157,7 @@ class CustomSpecAugment:
         elif self.method == "median":
             padding_values = torch.median(spectrogram, dim=1).values
         elif self.method == "mean":
-            padding_values = torch.mean(spectrogram, dim=1).values
+            padding_values = torch.mean(spectrogram, dim=1)
         elif self.method == "random":
             padding_values = torch.rand(spectrogram.size(0))
         else:
