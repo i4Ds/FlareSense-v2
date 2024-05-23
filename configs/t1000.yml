@@ -1,5 +1,5 @@
 general:
-  batch_size: 32
+  batch_size: 64
   max_epochs: 20
   binary: True
   use_random_sampler: False
@@ -12,13 +12,13 @@ model:
   lr: 0.009092421294035468
 
 data:
-  train_path: i4ds/radio-sunburst-ecallisto-paths-df
-  val_path: i4ds/radio-sunburst-ecallisto-paths-df
-  test_path: i4ds/radio-sunburst-ecallisto-paths-df
+  train_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
+  val_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
+  test_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
   antennas: []
   reduce_non_burst: False
   train_class_to_reduce: 0
   reduction_fraction: 0.2
-  use_augmentation: False
+  use_augmentation: True
   frequency_masking_para: 30
   freq_mask_method: max

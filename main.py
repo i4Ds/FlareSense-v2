@@ -4,7 +4,7 @@ import torch
 import yaml
 from datasets import load_dataset
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
 import os
@@ -138,10 +138,18 @@ if __name__ == "__main__":
 
     # Checkpoint to save the best model based on the lowest validation loss
     checkpoint_callback_rafp = ModelCheckpoint(
-        monitor="val_loss",
+        monitor="val_f1",
         dirpath=wandb_logger.experiment.dir,
-        filename="loss-{epoch:02d}-{step:05d}-{val_loss:.2f}",
+        filename="f1-{epoch:02d}-{step:05d}-{val_f1:.3f}",
         save_top_k=1,
+        mode="max",
+    )
+
+    # Early stopping based on validation loss
+    early_stopping_callback = EarlyStopping(
+        monitor="val_loss",
+        patience=3 * 4,  # It's 3 Epochs.
+        verbose=True,
         mode="min",
     )
 
@@ -163,6 +171,7 @@ if __name__ == "__main__":
         logger=wandb_logger,
         enable_progress_bar=True,
         val_check_interval=0.25,  # 4x during an epoch.
+        callbacks=[checkpoint_callback_rafp, early_stopping_callback],
     )
 
     # Train
@@ -187,8 +196,8 @@ if __name__ == "__main__":
     test_dataloader = DataLoader(
         ds_t,
         batch_size=config["general"]["batch_size"],
-        num_workers=8,
-        shuffle=True,  # To randomly log images
+        num_workers=os.cpu_count(),
+        shuffle=False,
         persistent_workers=False,
     )
     trainer.test(model, test_dataloader, ckpt_path="best")
