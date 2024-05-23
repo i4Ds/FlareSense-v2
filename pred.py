@@ -48,12 +48,18 @@ def load_model(checkpoint_path, config_path, device):
 
 
 def prepare_datasets(config):
-    ds = load_dataset("i4ds/radio-sunburst-ecallisto-paths-df")
-    dd = DatasetDict()
-    dd["train"] = ds["train"]
-    dd["test"] = ds["test"]
-    dd["validation"] = ds["validation"]
+    ds_train = load_dataset(config["data"]["train_path"], split="train")
+    ds_valid = load_dataset(config["data"]["train_path"], split="validation")
+    ds_test = load_dataset(config["data"]["train_path"], split="test")
 
+    dd = DatasetDict()
+    dd["train"] = ds_train
+    dd["test"] = ds_test
+    dd["validation"] = ds_valid
+    return dd
+
+
+def prepare_ecallisto_datasets(dd, config):
     resize_func = Compose(
         [lambda x: custom_resize(x, tuple(config["model"]["input_size"]))]
     )
@@ -77,7 +83,7 @@ def prepare_datasets(config):
     return ds_train, ds_valid, ds_test
 
 
-def prepare_dataloaders(ds_train, ds_valid, ds_test, batch_size=128):
+def prepare_dataloaders(ds_train, ds_valid, ds_test, batch_size):
     train_dataloader = DataLoader(
         ds_train, batch_size=batch_size, shuffle=False, persistent_workers=False
     )
@@ -100,32 +106,35 @@ def main(checkpoint_reference, config):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load model and configuration
-    model, config = load_model(artifact.file(), artifact.file(), device)
+    model, config = load_model(artifact.file(), config, device)
 
     # Prepare datasets and dataloaders
-    ds_train, ds_valid, ds_test = prepare_datasets(config)
-    train_dataloader, val_dataloader, test_dataloader = prepare_dataloaders(
-        ds_train, ds_valid, ds_test
-    )
+    dd = prepare_datasets(config)
 
     # Convert datetime columns to pd.datetime
-    df_train = pd.DataFrame(ds_train)
-    df_val = pd.DataFrame(ds_valid)
-    df_test = pd.DataFrame(ds_test)
+    df_train = pd.DataFrame(dd["train"])
+    df_val = pd.DataFrame(dd["validation"])
+    df_test = pd.DataFrame(dd["test"])
 
     for df in [df_train, df_val, df_test]:
         df["datetime"] = pd.to_datetime(df["datetime"], format="%Y-%m-%d_%H-%M-%S")
 
+    # Create ecallisto dataset and dataloader
+    ds_train, ds_valid, ds_test = prepare_ecallisto_datasets(dd, config)
+    train_dataloader, val_dataloader, test_dataloader = prepare_dataloaders(
+        ds_train, ds_valid, ds_test, config["general"]["batch_size"]
+    )
+
     # Predict probabilities
-    df_train["pred"] = create_probs(model, train_dataloader, device)
     df_val["pred"] = create_probs(model, val_dataloader, device)
     df_test["pred"] = create_probs(model, test_dataloader, device)
+    df_train["pred"] = create_probs(model, train_dataloader, device)
 
     # Save to CSV
-    df_train.to_csv(f"{artifact.digest}_train.csv")
     df_val.to_csv(f"{artifact.digest}_val.csv")
     df_test.to_csv(f"{artifact.digest}_test.csv")
+    df_train.to_csv(f"{artifact.digest}_train.csv")
 
 
 if __name__ == "__main__":
-    main()
+    main("vincenzo-timmel/FlareSense-v2/best_model:v130", "configs/t1000.yml")

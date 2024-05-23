@@ -13,19 +13,20 @@ parameters:
         max: 1.0e-1
         min: 1.0e-7
       model_type:
-        values: [resnet18, resnet34, resnet52]
+        values: [resnet18, resnet34]
       optimizer_name:
         values: [adamw, adam]
   data:
     parameters:
-      simple_normalization:
-        values: [True, False]
-      reduce_non_burst:
-        values: [True, False]
+      freq_mask_method:
+        values: [min, max, mean, median]
       freq_mask_param:
         max: 56
         min: 1
-
+  general:
+    parameters:
+      batch_size:
+        values: [32, 64, 128]
 
 
 command:

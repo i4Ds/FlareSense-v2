@@ -36,6 +36,8 @@ class EcallistoDataset(Dataset):
         else:
             example["image"] = pil_to_tensor(example["image"]).float()
         example["label"] = torch.tensor(example["label"])
+        if not isinstance(example["datetime"], str):
+            example["datetime"] = str(example["datetime"])
         return example
 
     def __len__(self):
