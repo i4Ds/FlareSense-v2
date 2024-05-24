@@ -22,4 +22,4 @@ data:
   use_augmentation: True
   frequency_masking_para: 30
   freq_mask_method: max
-  time_warp_w: 6
+  time_warp_w: 50

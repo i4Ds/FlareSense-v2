@@ -88,25 +88,22 @@ if __name__ == "__main__":
         ]
     )
     if config["data"]["use_augmentation"]:
-        data_augm_transform = Compose(
-            [
-                CustomSpecAugment(
-                    frequency_masking_para=config["data"]["frequency_masking_para"],
-                    method=config["data"]["freq_mask_method"],
-                ),
-                TimeWarpAugmenter(config["data"]["time_warp_w"]),
-            ]
+        augm_before_resize = TimeWarpAugmenter(config["data"]["time_warp_w"])
+        augm_after_resize = CustomSpecAugment(
+            frequency_masking_para=config["data"]["frequency_masking_para"],
+            method=config["data"]["freq_mask_method"],
         )
-
     else:
-        data_augm_transform = None
+        augm_before_resize = None
+        augm_after_resize = None
 
     # Data Loader
     ds_train = EcallistoDatasetBinary(
         ds_train,
         resize_func=resize_func,
-        data_augm_transform=data_augm_transform,
         normalization_transform=preprocess_spectrogram,
+        augm_before_resize=augm_before_resize,
+        augm_after_resize=augm_after_resize,
     )
     ds_valid = EcallistoDatasetBinary(
         ds_valid,

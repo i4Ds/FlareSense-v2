@@ -17,13 +17,19 @@ import torch.nn.functional as F
 # Dataset
 class EcallistoDataset(Dataset):
     def __init__(
-        self, dataset, resize_func, normalization_transform, data_augm_transform=None
+        self,
+        dataset,
+        resize_func,
+        normalization_transform,
+        augm_before_resize=None,
+        augm_after_resize=None,
     ):
         super().__init__()
         self.data = dataset
-        self.data_augm_transform = data_augm_transform
-        self.resize_func = resize_func
         self.normalization_transform = normalization_transform
+        self.augm_before_resize = augm_before_resize
+        self.augm_after_resize = augm_after_resize
+        self.resize_func = resize_func
         self.dataset_label_weight = self.get_dataset_label_weight()
 
     @staticmethod
@@ -71,11 +77,16 @@ class EcallistoDataset(Dataset):
 
         # Normalization
         example["image"] = self.normalization_transform(example["image"])
+
+        # Data aug
+        if self.augm_before_resize is not None:
+            example["image"] = self.augm_before_resize(example["image"])
+
         # Resize
         example["image"] = self.resize_func(example["image"])
-        # Data aug
-        if self.data_augm_transform is not None:
-            example["image"] = self.data_augm_transform(example["image"])
+
+        if self.augm_after_resize is not None:
+            example["image"] = self.augm_after_resize(example["image"])
 
         # Returns all
         return (
@@ -109,14 +120,16 @@ class EcallistoDatasetBinary(EcallistoDataset):
         dataset,
         resize_func,
         normalization_transform,
-        data_augm_transform=None,
+        augm_before_resize=None,
+        augm_after_resize=None,
     ):
         # Initialize the parent class
         super().__init__(
             dataset,
             resize_func,
             normalization_transform,
-            data_augm_transform=data_augm_transform,
+            augm_before_resize=augm_before_resize,
+            augm_after_resize=augm_after_resize,
         )
 
     def __getitem__(self, index):

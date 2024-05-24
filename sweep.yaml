@@ -4,14 +4,14 @@ method: bayes
 project: FlareSense-v2
 entity: vincenzo-timmel
 metric:
-  name: test_precision
+  name: test_f1
   goal: maximize
 parameters:
   model:
     parameters:
       lr:
-        max: 1.0e-1
-        min: 1.0e-7
+        max: 1.0e-2
+        min: 1.0e-6
       model_type:
         values: [resnet18, resnet34]
       optimizer_name:
@@ -21,10 +21,10 @@ parameters:
       freq_mask_method:
         values: [mean, random]
       freq_mask_param:
-        max: 56
+        max: 60
         min: 0
       time_warp_w:
-        max: 20
+        max: 80
         min: 0
 
 
