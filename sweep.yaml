@@ -24,7 +24,7 @@ parameters:
         max: 60
         min: 0
       time_warp_w:
-        max: 1500
+        max: 80
         min: 0
 
 
