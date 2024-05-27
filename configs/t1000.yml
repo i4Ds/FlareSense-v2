@@ -20,6 +20,6 @@ data:
   train_class_to_reduce: 0
   reduction_fraction: 0.2
   use_augmentation: True
-  frequency_masking_para: 0
+  frequency_masking_para: 30
   freq_mask_method: random
-  time_warp_w: 0
+  time_warp_w: 62
