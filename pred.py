@@ -49,8 +49,8 @@ def load_model(checkpoint_path, config_path, device):
 
 def prepare_datasets(config):
     ds_train = load_dataset(config["data"]["train_path"], split="train")
-    ds_valid = load_dataset(config["data"]["train_path"], split="validation")
-    ds_test = load_dataset(config["data"]["train_path"], split="test")
+    ds_valid = load_dataset(config["data"]["val_path"], split="validation")
+    ds_test = load_dataset(config["data"]["test_path"], split="test")
 
     dd = DatasetDict()
     dd["train"] = ds_train
@@ -126,15 +126,15 @@ def main(checkpoint_reference, config):
     )
 
     # Predict probabilities
-    df_val["pred"] = create_probs(model, val_dataloader, device)
+    # df_val["pred"] = create_probs(model, val_dataloader, device)
     df_test["pred"] = create_probs(model, test_dataloader, device)
-    df_train["pred"] = create_probs(model, train_dataloader, device)
+    # df_train["pred"] = create_probs(model, train_dataloader, device)
 
     # Save to CSV
-    df_val.to_csv(f"{artifact.digest}_val.csv")
+    # df_val.to_csv(f"{artifact.digest}_val.csv")
     df_test.to_csv(f"{artifact.digest}_test.csv")
-    df_train.to_csv(f"{artifact.digest}_train.csv")
+    # df_train.to_csv(f"{artifact.digest}_train.csv")
 
 
 if __name__ == "__main__":
-    main("vincenzo-timmel/FlareSense-v2/best_model:v130", "configs/t1000.yml")
+    main("vincenzo-timmel/FlareSense-v2/best_model:v183", "configs/t1000.yml")

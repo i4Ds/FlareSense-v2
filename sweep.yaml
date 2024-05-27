@@ -14,13 +14,11 @@ parameters:
         min: 1.0e-6
       model_type:
         values: [resnet18, resnet34]
-      optimizer_name:
-        values: [adamw, adam]
   data:
     parameters:
       freq_mask_method:
         values: [mean, random]
-      freq_mask_param:
+      frequency_masking_para:
         max: 60
         min: 0
       time_warp_w:

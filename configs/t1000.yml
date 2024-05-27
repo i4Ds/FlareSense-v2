@@ -8,8 +8,8 @@ general:
 model:
   model_type: resnet18
   input_size: [224, 224]
-  optimizer_name: adamw
-  lr: 0.009092421294035468
+  optimizer_name: adam
+  lr: 0.004307641758212711
 
 data:
   train_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
@@ -20,6 +20,6 @@ data:
   train_class_to_reduce: 0
   reduction_fraction: 0.2
   use_augmentation: True
-  frequency_masking_para: 30
-  freq_mask_method: max
-  time_warp_w: 50
+  frequency_masking_para: 0
+  freq_mask_method: random
+  time_warp_w: 0

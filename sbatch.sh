@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --time=48:00:00
+#SBATCH --time=06:00:00
 #SBATCH --ntasks-per-node=1
 #SBATCH --job-name sweep_flaresense-v2
 #SBATCH --mem=32G
@@ -8,4 +8,4 @@
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 
-wandb agent vincenzo-timmel/FlareSense-v2/9m34zppd
+python main.py --config configs/t1000.yml
