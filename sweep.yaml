@@ -12,8 +12,6 @@ parameters:
       lr:
         max: 1.0e-2
         min: 1.0e-6
-      model_type:
-        values: [resnet18, resnet34]
   data:
     parameters:
       freq_mask_method:

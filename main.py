@@ -77,9 +77,10 @@ if __name__ == "__main__":
         )
 
     # Filter by certain antennas
-    if len(config["data"]["antennas"]) > 0:
-        ds_train = filter_antennas(ds_train, config["data"]["antennas"])
-        ds_valid = filter_antennas(ds_valid, config["data"]["antennas"])
+    if len(config["data"]["antennas_train"]) > 0:
+        ds_train = filter_antennas(ds_train, config["data"]["antennas_train"])
+    if len(config["data"]["antennas_val"]) > 0:
+        ds_valid = filter_antennas(ds_valid, config["data"]["antennas_val"])
 
     # Transforms
     resize_func = Compose(
@@ -187,8 +188,8 @@ if __name__ == "__main__":
     ds_test = load_dataset(config["data"]["test_path"], split="test")
 
     # Filter
-    if len(config["data"]["antennas"]) > 0:
-        ds_test = filter_antennas(ds_test, config["data"]["antennas"])
+    if len(config["data"]["antennas_test"]) > 0:
+        ds_test = filter_antennas(ds_test, config["data"]["antennas_test"])
 
     ds_t = EcallistoDatasetBinary(
         ds_test,
