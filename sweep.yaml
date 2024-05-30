@@ -15,12 +15,12 @@ parameters:
   data:
     parameters:
       freq_mask_method:
-        values: [mean, random]
+        values: [mean, random, max]
       frequency_masking_para:
-        max: 60
+        max: 80
         min: 0
       time_warp_w:
-        max: 80
+        max: 1500
         min: 0
 
 
