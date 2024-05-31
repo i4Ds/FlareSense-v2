@@ -66,8 +66,12 @@ if __name__ == "__main__":
     print(dict(config))
 
     # Create dataset
-    ds_train = load_dataset(config["data"]["train_path"], split="train")
-    ds_valid = load_dataset(config["data"]["train_path"], split="validation")
+    ds_train = load_dataset(
+        config["data"]["train_path"], split=config["data"]["train_split"]
+    )
+    ds_valid = load_dataset(
+        config["data"]["train_path"], split=config["data"]["val_split"]
+    )
 
     if config["data"]["reduce_non_burst"]:
         ds_train = randomly_reduce_class_samples(
@@ -185,7 +189,9 @@ if __name__ == "__main__":
 
     ## Evaluate
     # Create test set
-    ds_test = load_dataset(config["data"]["test_path"], split="test")
+    ds_test = load_dataset(
+        config["data"]["test_path"], split=config["data"]["test_split"]
+    )
 
     # Filter
     if len(config["data"]["antennas_test"]) > 0:

@@ -13,8 +13,11 @@ model:
 
 data:
   train_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
+  train_split: test
   val_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
+  val_split: test
   test_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
+  test_split: test
   antennas_train: [
     "GLASGOW_01",
     "BIR_01",
@@ -86,6 +89,6 @@ data:
   train_class_to_reduce: 0
   reduction_fraction: 0.2
   use_augmentation: True
-  frequency_masking_para: 30
+  frequency_masking_para: 50
   freq_mask_method: random
-  time_warp_w: 0
+  time_warp_w: 80
