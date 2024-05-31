@@ -167,7 +167,8 @@ class EcallistoBase(LightningModule):
             on_step=False,
         )
 
-        # Log the confusion matrix
+    def on_test_epoch_end(self):
+        # Compute the confusion matrix
         confmat = self.confmat.compute()
         fig, ax = plt.subplots()
         sns.heatmap(confmat.cpu().numpy(), annot=True, fmt="g", ax=ax)
@@ -181,6 +182,9 @@ class EcallistoBase(LightningModule):
         )
 
         plt.close(fig)
+
+        # Reset confusion matrix for the next epoch
+        self.confmat.reset()
 
     def on_train_end(self):
         # Log the best model to wandb at the end of training

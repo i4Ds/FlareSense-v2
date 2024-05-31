@@ -26,6 +26,7 @@ data:
     "AUSTRIA-UNIGRAZ_01",
     "Australia-ASSA_62",
     "HUMAIN_59",
+    "MRO_59",
     "INDIA-OOTY_02",
     "SWISS-Landschlacht_62"
   ]
@@ -89,6 +90,6 @@ data:
   train_class_to_reduce: 0
   reduction_fraction: 0.2
   use_augmentation: True
-  frequency_masking_para: 50
+  frequency_masking_para: 0
   freq_mask_method: random
-  time_warp_w: 80
+  time_warp_w: 0
