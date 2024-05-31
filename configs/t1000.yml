@@ -13,9 +13,9 @@ model:
 
 data:
   train_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
-  train_split: test
+  train_split: train
   val_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
-  val_split: test
+  val_split: validation
   test_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
   test_split: test
   antennas_train: [
