@@ -49,12 +49,6 @@ class EcallistoBase(LightningModule):
         self.optimizer_name = optimizer_name
         self.learning_rate = learning_rate
 
-    @staticmethod
-    def calculate_prediction(y_hat):
-        probabilities = F.softmax(y_hat, dim=1).squeeze()
-        preds = torch.where(probabilities[:, 1] > 0.5, 1, 0)
-        return probabilities, preds
-
     def training_step(self, batch, batch_idx):
         x, y, _, _ = batch
         y_hat = self(x)
@@ -225,37 +219,3 @@ class ResNet(EcallistoBase):
         if x.size(1) == 1:
             x = x.repeat(1, 3, 1, 1)
         return self.resnet(x)
-
-
-def create_normalize_function(antenna_stats, simple):
-    def normalize(image, antenna):
-        # Retrieve the statistics for the given antenna
-        stats = antenna_stats[antenna]
-
-        # Apply normalization (Assuming image is a torch.Tensor)
-        normalized_image = (image - stats["min"]) / (stats["max"] - stats["min"])
-        # normalized_image = (2 * ((image - stats["min"]) / (stats["max"] - stats["min"])) - 1)
-        normalized_image = (normalized_image - stats["mean"]) / stats["std"]
-
-        return normalized_image
-
-    def simple_normalize(image, antenna):
-        return image / 254.0
-
-    return simple_normalize if simple else normalize
-
-
-def create_unnormalize_function(antenna_stats):
-    def unnormalize(normalized_image, antenna):
-        # Retrieve the statistics for the given antenna
-        stats = antenna_stats[antenna]
-
-        # Reverse the normalization
-        unnormalized_image = normalized_image * stats["std"] + stats["mean"]
-        unnormalized_image = (
-            unnormalized_image * (stats["max"] - stats["min"]) + stats["min"]
-        )
-
-        return unnormalized_image.to(torch.uint8)
-
-    return unnormalize
