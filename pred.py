@@ -137,4 +137,4 @@ def main(checkpoint_reference, config):
 
 
 if __name__ == "__main__":
-    main("vincenzo-timmel/FlareSense-v2/best_model:v183", "configs/t1000.yml")
+    main("vincenzo-timmel/FlareSense-v2/best_model:v233", "configs/t1001.yml")

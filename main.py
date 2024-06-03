@@ -145,7 +145,7 @@ if __name__ == "__main__":
     )
 
     # Checkpoint to save the best model based on the lowest validation loss
-    checkpoint_callback_rafp = ModelCheckpoint(
+    checkpoint_callback_f1 = ModelCheckpoint(
         monitor="val_f1",
         dirpath=wandb_logger.experiment.dir,
         filename="f1-{epoch:02d}-{step:05d}-{val_f1:.3f}",
@@ -179,7 +179,7 @@ if __name__ == "__main__":
         logger=wandb_logger,
         enable_progress_bar=False,
         val_check_interval=0.25,  # 4x during an epoch.
-        callbacks=[checkpoint_callback_rafp, early_stopping_callback],
+        callbacks=[checkpoint_callback_f1, early_stopping_callback],
     )
 
     # Train
