@@ -1,5 +1,3 @@
-import random
-
 import numpy as np
 import torch
 from sklearn.utils.class_weight import compute_class_weight
@@ -7,8 +5,6 @@ from torch.utils.data import Dataset
 from torchvision.transforms.functional import pil_to_tensor
 from torchvision.transforms import Resize
 import torch
-from torchvision import transforms
-import os
 import pandas as pd
 import torch
 import torch.nn.functional as F
@@ -21,6 +17,7 @@ class EcallistoDataset(Dataset):
         dataset,
         resize_func,
         normalization_transform,
+        load_into_memory=True,
         augm_before_resize=None,
         augm_after_resize=None,
     ):
@@ -31,6 +28,10 @@ class EcallistoDataset(Dataset):
         self.augm_after_resize = augm_after_resize
         self.resize_func = resize_func
         self.dataset_label_weight = self.get_dataset_label_weight()
+        self.load_into_memory = load_into_memory
+
+        if self.load_into_memory:
+            self.data_in_memory = [self._process_item(i) for i in range(len(self.data))]
 
     @staticmethod
     def to_torch_tensor(example):
@@ -48,7 +49,7 @@ class EcallistoDataset(Dataset):
 
     def __len__(self):
         """Function to return the number of records in the dataset"""
-        return len(self.data)
+        return len(self.data_in_memory) if self.load_into_memory else len(self.data)
 
     def get_labels(self):
         return self.get_dataset_labels()
@@ -71,24 +72,24 @@ class EcallistoDataset(Dataset):
         sample_weights = [class_weights[label] for label in labels]
         return sample_weights
 
-    def __getitem__(self, index):
-        """Function to return samples corresponding to a given index from a dataset"""
+    def _process_item(self, index):
+        """Process a single item and return it."""
         example = self.to_torch_tensor(self.data[index])
 
         # Normalization
         example["image"] = self.normalization_transform(example["image"])
 
-        # Data aug
+        # Data augmentation before resize
         if self.augm_before_resize is not None:
             example["image"] = self.augm_before_resize(example["image"])
 
         # Resize
         example["image"] = self.resize_func(example["image"])
 
+        # Data augmentation after resize
         if self.augm_after_resize is not None:
             example["image"] = self.augm_after_resize(example["image"])
 
-        # Returns all
         return (
             example["image"].unsqueeze(0),
             example["label"],
@@ -96,22 +97,11 @@ class EcallistoDataset(Dataset):
             example["datetime"],
         )
 
-    def save_image(self, image_tensor, antenna, datetime):
-        # Create a directory to save the image
-        save_dir = "saved_images"
-        os.makedirs(save_dir, exist_ok=True)
-
-        # Convert datetime to a filename-friendly format
-        datetime_str = datetime.replace(":", "-").replace(" ", "_")
-
-        # Define the filename
-        filename = f"{antenna}_{datetime_str}.png"
-        file_path = os.path.join(save_dir, filename)
-
-        # Convert the tensor to a PIL Image and save it
-        image = transforms.ToPILImage()(image_tensor)
-        image.save(file_path)
-        print(f"Image saved to {file_path}")
+    def __getitem__(self, index):
+        """Function to return samples corresponding to a given index from a dataset"""
+        if self.load_into_memory:
+            return self.data_in_memory[index]
+        return self._process_item(index)
 
 
 class EcallistoDatasetBinary(EcallistoDataset):
@@ -209,7 +199,9 @@ class TimeWarpAugmenter:
         if self.W == 0:
             return specs
         if specs.size(-1) <= 2 * self.W:
-            print(f"Spec is too short to do time warping. Got: {specs.size(-1)}. Expected (min.): {2 * self.W + 1}")
+            print(
+                f"Spec is too short to do time warping. Got: {specs.size(-1)}. Expected (min.): {2 * self.W + 1}"
+            )
             return specs
         if not torch.is_tensor(specs):
             specs = torch.from_numpy(specs)
