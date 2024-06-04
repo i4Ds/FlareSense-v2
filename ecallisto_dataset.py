@@ -8,6 +8,7 @@ import torch
 import pandas as pd
 import torch
 import torch.nn.functional as F
+import os
 
 
 # Dataset
@@ -17,6 +18,8 @@ class EcallistoDataset(Dataset):
         dataset,
         resize_func,
         normalization_transform,
+        cache=True,
+        cache_dir="/tmp/vincenzo/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
     ):
@@ -28,8 +31,11 @@ class EcallistoDataset(Dataset):
         self.resize_func = resize_func
         self.dataset_label_weight = self.get_dataset_label_weight()
 
+        self.cache = cache
+        self.cache_dir = cache_dir
+
     @staticmethod
-    def to_torch_tensor(example):
+    def image_to_torch_tensor(example):
         # Convert the example to a torch tensor
         if "file_path" in example:
             # It's a parquet file, containing a DF
@@ -37,9 +43,6 @@ class EcallistoDataset(Dataset):
             example["image"] = torch.from_numpy(df.values.T).float()
         else:
             example["image"] = pil_to_tensor(example["image"]).float()
-        example["label"] = torch.tensor(example["label"])
-        if not isinstance(example["datetime"], str):
-            example["datetime"] = str(example["datetime"])
         return example
 
     def __len__(self):
@@ -67,9 +70,30 @@ class EcallistoDataset(Dataset):
         sample_weights = [class_weights[label] for label in labels]
         return sample_weights
 
+    def __create_cache_path(self, example):
+        return os.path.join(
+            self.cache_dir,
+            example["antenna"],
+            example["label"],
+            example["datetime"] + ".torch",
+        )
+
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
-        example = self.to_torch_tensor(self.data[index])
+        example = self.data[index]
+        if self.cache:
+            example_image_path = self.__create_cache_path(example)
+            if os.path.exists(example_image_path):
+                image = torch.load(example_image_path)
+            else:
+                image = self.image_to_torch_tensor(example)
+
+        example["image"] = image
+
+        # Type casting
+        if not isinstance(example["datetime"], str):
+            example["datetime"] = str(example["datetime"])
+        example["label"] = torch.tensor(example["label"])
 
         # Normalization
         example["image"] = self.normalization_transform(example["image"])
@@ -84,6 +108,9 @@ class EcallistoDataset(Dataset):
         # Data augmentation after resize
         if self.augm_after_resize is not None:
             example["image"] = self.augm_after_resize(example["image"])
+
+        if self.cache and not os.path.exists(example_image_path):
+            example["image"].save(example_image_path)
 
         return (
             example["image"].unsqueeze(0),
