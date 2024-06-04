@@ -38,7 +38,7 @@ class EcallistoBase(LightningModule):
             self.recall = Recall(task="binary")
             self.precision = Precision(task="binary")
             self.f1_score = F1Score(task="binary")
-            self.confmat = ConfusionMatrix(task="binary", normalize="true")
+            self.confmat = ConfusionMatrix(task="binary")
         else:
             self.recall = Recall(
                 num_classes=n_classes, task="multiclass", average="macro"
@@ -49,9 +49,7 @@ class EcallistoBase(LightningModule):
             self.f1_score = F1Score(
                 num_classes=n_classes, task="multiclass", average="macro"
             )
-            self.confmat = ConfusionMatrix(
-                num_classes=n_classes, task="multiclass", normalize="true"
-            )
+            self.confmat = ConfusionMatrix(num_classes=n_classes, task="multiclass")
         self.class_weights = class_weights
         self.loss_function = (
             F.cross_entropy if n_classes > 1 else F.binary_cross_entropy
