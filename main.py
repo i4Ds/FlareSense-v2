@@ -203,17 +203,22 @@ if __name__ == "__main__":
     if len(config["data"]["antennas_test"]) > 0:
         ds_test = filter_antennas(ds_test, config["data"]["antennas_test"])
 
-    ds_t = EcallistoDatasetBinary(
+    ds_test = EcallistoDatasetBinary(
         ds_test,
         resize_func=resize_func,
         normalization_transform=remove_background,
     )
     # Create dataloader
     test_dataloader = DataLoader(
-        ds_t,
+        ds_test,
         batch_size=config["general"]["batch_size"],
         num_workers=8,
         shuffle=False,
         persistent_workers=False,
     )
     trainer.test(model, test_dataloader, ckpt_path="best")
+
+    # Clean up data
+    ds_test.clean_up()
+    ds_train.clean_up()
+    ds_valid.clean_up()

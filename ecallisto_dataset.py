@@ -52,9 +52,12 @@ class EcallistoDataset(Dataset):
         """Function to return the number of records in the dataset"""
         return len(self.data)
 
-    def __del__(self):
+    def clean_up(self):
         shutil.rmtree(self.cache_dir)
         super().__del__()
+
+    def __del__(self):
+        self.clean_up()
 
     def get_labels(self):
         return self.get_dataset_labels()
