@@ -17,7 +17,7 @@ from ecallisto_dataset import (
     CustomSpecAugment,
     TimeWarpAugmenter,
     EcallistoDatasetBinary,
-    preprocess_spectrogram,
+    remove_background,
     custom_resize,
 )
 from ecallisto_model import (
@@ -112,14 +112,14 @@ if __name__ == "__main__":
     ds_train = EcallistoDatasetBinary(
         ds_train,
         resize_func=resize_func,
-        normalization_transform=preprocess_spectrogram,
+        normalization_transform=remove_background,
         augm_before_resize=augm_before_resize,
         augm_after_resize=augm_after_resize,
     )
     ds_valid = EcallistoDatasetBinary(
         ds_valid,
         resize_func=resize_func,
-        normalization_transform=preprocess_spectrogram,
+        normalization_transform=remove_background,
     )
 
     # Incase we want to get a weighted random sampler (oversample rare classes)
@@ -206,7 +206,7 @@ if __name__ == "__main__":
     ds_t = EcallistoDatasetBinary(
         ds_test,
         resize_func=resize_func,
-        normalization_transform=preprocess_spectrogram,
+        normalization_transform=remove_background,
     )
     # Create dataloader
     test_dataloader = DataLoader(

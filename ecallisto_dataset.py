@@ -10,6 +10,8 @@ import torch
 import torch.nn.functional as F
 import os
 from pathlib import Path
+from uuid import uuid4
+import shutil
 
 
 # Dataset
@@ -20,7 +22,7 @@ class EcallistoDataset(Dataset):
         resize_func,
         normalization_transform,
         cache=True,
-        cache_dir="/tmp/vincenzo/ecallisto",
+        cache_base_dir="/tmp/vincenzo/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
     ):
@@ -33,7 +35,7 @@ class EcallistoDataset(Dataset):
         self.dataset_label_weight = self.get_dataset_label_weight()
 
         self.cache = cache
-        self.cache_dir = cache_dir
+        self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
 
     @staticmethod
     def image_to_torch_tensor(example):
@@ -49,6 +51,10 @@ class EcallistoDataset(Dataset):
     def __len__(self):
         """Function to return the number of records in the dataset"""
         return len(self.data)
+
+    def __del__(self):
+        shutil.rmtree(self.cache_dir)
+        super().__del__()
 
     def get_labels(self):
         return self.get_dataset_labels()
@@ -93,26 +99,30 @@ class EcallistoDataset(Dataset):
                 image = torch.load(example_image_path)
             else:
                 image = self.image_to_torch_tensor(example)
+
+                # Normalization
+                image = self.normalization_transform(image)
+
+                # Data augmentation before resize
+                if self.augm_before_resize is not None:
+                    image = self.augm_before_resize(image)
+
+                # Resize
+                image = self.resize_func(image)
+
+                # Data augmentation after resize
+                if self.augm_after_resize is not None:
+                    image = self.augm_after_resize(image)
+
+                # Min max scaling
+                image = global_min_max_scale(image)
+
                 os.makedirs(os.path.dirname(example_image_path), exist_ok=True)
                 torch.save(image, example_image_path)
 
         # Create example
-        example["image"] = image
         example["label"] = torch.tensor(example["label"])
-
-        # Normalization
-        example["image"] = self.normalization_transform(example["image"])
-
-        # Data augmentation before resize
-        if self.augm_before_resize is not None:
-            example["image"] = self.augm_before_resize(example["image"])
-
-        # Resize
-        example["image"] = self.resize_func(example["image"])
-
-        # Data augmentation after resize
-        if self.augm_after_resize is not None:
-            example["image"] = self.augm_after_resize(example["image"])
+        example["image"] = image
 
         return (
             example["image"].unsqueeze(0),
@@ -370,16 +380,6 @@ def global_min_max_scale(spectrogram):
     scaled_spectrogram = (spectrogram - min_value) / (max_value - min_value)
 
     return scaled_spectrogram
-
-
-def preprocess_spectrogram(spectrogram):
-    # Remove background
-    spectrogram = remove_background(spectrogram)
-
-    # Apply global Min-Max scaling
-    spectrogram = global_min_max_scale(spectrogram)
-
-    return spectrogram
 
 
 def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):
