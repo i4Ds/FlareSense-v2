@@ -33,7 +33,8 @@ class EcallistoBase(LightningModule):
         learning_rate,
     ):
         super().__init__()
-        if n_classes == 2:
+        assert n_classes >= 1, "You have 1 or 0 Classes?"
+        if n_classes == 1:
             self.recall = Recall(task="binary")
             self.precision = Precision(task="binary")
             self.f1_score = F1Score(task="binary")
@@ -52,7 +53,9 @@ class EcallistoBase(LightningModule):
                 num_classes=n_classes, task="multiclass", normalize="true"
             )
         self.class_weights = class_weights
-        self.loss_function = F.cross_entropy
+        self.loss_function = (
+            F.cross_entropy if n_classes > 1 else F.binary_cross_entropy
+        )
         self.batch_size = batch_size
 
         # Optimizer

@@ -17,7 +17,6 @@ class EcallistoDataset(Dataset):
         dataset,
         resize_func,
         normalization_transform,
-        load_into_memory=True,
         augm_before_resize=None,
         augm_after_resize=None,
     ):
@@ -28,10 +27,6 @@ class EcallistoDataset(Dataset):
         self.augm_after_resize = augm_after_resize
         self.resize_func = resize_func
         self.dataset_label_weight = self.get_dataset_label_weight()
-        self.load_into_memory = load_into_memory
-
-        if self.load_into_memory:
-            self.data_in_memory = [self._process_item(i) for i in range(len(self.data))]
 
     @staticmethod
     def to_torch_tensor(example):
@@ -49,7 +44,7 @@ class EcallistoDataset(Dataset):
 
     def __len__(self):
         """Function to return the number of records in the dataset"""
-        return len(self.data_in_memory) if self.load_into_memory else len(self.data)
+        return len(self.data)
 
     def get_labels(self):
         return self.get_dataset_labels()
@@ -72,8 +67,8 @@ class EcallistoDataset(Dataset):
         sample_weights = [class_weights[label] for label in labels]
         return sample_weights
 
-    def _process_item(self, index):
-        """Process a single item and return it."""
+    def __getitem__(self, index):
+        """Function to return samples corresponding to a given index from a dataset"""
         example = self.to_torch_tensor(self.data[index])
 
         # Normalization
@@ -96,12 +91,6 @@ class EcallistoDataset(Dataset):
             example["antenna"],
             example["datetime"],
         )
-
-    def __getitem__(self, index):
-        """Function to return samples corresponding to a given index from a dataset"""
-        if self.load_into_memory:
-            return self.data_in_memory[index]
-        return self._process_item(index)
 
 
 class EcallistoDatasetBinary(EcallistoDataset):
