@@ -30,4 +30,4 @@ command:
   - ${interpreter}
   - ${program}
   - "--config"
-  - "configs/t1000.yml" #Insert your model here (do not push it, adapt it each time.)
+  - "configs/t1001.yml" #Insert your model here (do not push it, adapt it each time.)

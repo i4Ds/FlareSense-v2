@@ -14,16 +14,18 @@ from ecallisto_dataset import (
 )
 
 
-def create_labels(model, dataloader, device):
+def create_probs(model, dataloader, device):
     model.eval()  # Ensure the model is in evaluation mode
     model.to(device)  # Send the model to the appropriate device
-    labels = []
+    class_1_prob = []
 
     with torch.no_grad():
         for inputs, _, _, _ in tqdm(dataloader):
-            y_hat = model(inputs)
-            labels.append(torch.argmax(y_hat, dim=1))
-    return labels
+            y_hat = model(inputs.to(device))
+            probs, _ = model.calculate_prediction(y_hat)
+            class_1_prob.extend(probs[:, 1].detach().cpu().tolist())
+
+    return class_1_prob
 
 
 def load_model(checkpoint_path, config_path, device):
@@ -125,7 +127,7 @@ def main(checkpoint_reference, config):
 
     # Predict probabilities
     # df_val["pred"] = create_probs(model, val_dataloader, device)
-    df_test["model_label"] = create_labels(model, test_dataloader, device)
+    df_test["pred"] = create_probs(model, test_dataloader, device)
     # df_train["pred"] = create_probs(model, train_dataloader, device)
 
     # Save to CSV

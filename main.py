@@ -17,7 +17,7 @@ from ecallisto_dataset import (
     CustomSpecAugment,
     TimeWarpAugmenter,
     EcallistoDatasetBinary,
-    preprocess_spectrogram,
+    remove_background,
     custom_resize,
 )
 from ecallisto_model import (
@@ -29,8 +29,8 @@ if __name__ == "__main__":
     print(f"PyTorch version {torch.__version__}")
     # Check if CUDA is available
     if torch.cuda.is_available():
-        device_id = torch.cuda.current_device()
-        device_name = torch.cuda.get_device_name(device_id)
+        device_id = os.environ["SLURM_JOB_GPUS"]
+        device_name = torch.cuda.get_device_name(torch.cuda.current_device())
         print(
             f"GPU is available: {device_name} (Device ID: {device_id}). I have {os.cpu_count()} cores available."
         )
@@ -54,7 +54,13 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
 
     # Setup wandb
-    wandb.init(entity="vincenzo-timmel", config=config)
+    wandb.init(
+        entity="vincenzo-timmel",
+        config=config,
+        settings=wandb.Settings(
+            _stats_disk_paths=("/mnt/nas05/data01/vincenzo/", "/"),
+        ),
+    ),
     wandb_logger = WandbLogger(log_model=False)  # Push it only on training end.
 
     # Overwrite config with wandb config (for sweep etc.)
@@ -93,7 +99,7 @@ if __name__ == "__main__":
         ]
     )
     if config["data"]["use_augmentation"]:
-        augm_before_resize = TimeWarpAugmenter(config["data"]["time_warp_w"])
+        augm_before_resize = TimeWarpAugmenter(W=config["data"]["time_warp_w"])
         augm_after_resize = CustomSpecAugment(
             frequency_masking_para=config["data"]["frequency_masking_para"],
             method=config["data"]["freq_mask_method"],
@@ -106,14 +112,14 @@ if __name__ == "__main__":
     ds_train = EcallistoDatasetBinary(
         ds_train,
         resize_func=resize_func,
-        normalization_transform=preprocess_spectrogram,
+        normalization_transform=remove_background,
         augm_before_resize=augm_before_resize,
         augm_after_resize=augm_after_resize,
     )
     ds_valid = EcallistoDatasetBinary(
         ds_valid,
         resize_func=resize_func,
-        normalization_transform=preprocess_spectrogram,
+        normalization_transform=remove_background,
     )
 
     # Incase we want to get a weighted random sampler (oversample rare classes)
@@ -129,7 +135,7 @@ if __name__ == "__main__":
         ds_train,
         sampler=sampler,
         batch_size=config["general"]["batch_size"],
-        num_workers=os.cpu_count(),
+        num_workers=8,
         pin_memory=True,
         shuffle=False if sampler is not None else True,
         persistent_workers=True,
@@ -138,7 +144,7 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(
         ds_valid,
         batch_size=config["general"]["batch_size"],
-        num_workers=os.cpu_count(),
+        num_workers=8,
         pin_memory=True,
         shuffle=False,
         persistent_workers=True,
@@ -156,7 +162,7 @@ if __name__ == "__main__":
     # Early stopping based on validation loss
     early_stopping_callback = EarlyStopping(
         monitor="val_loss",
-        patience=3 * 4,  # It's 3 Epochs.
+        patience=3,  # It's 3 Epochs.
         verbose=True,
         mode="min",
     )
@@ -177,8 +183,8 @@ if __name__ == "__main__":
         accelerator="gpu",
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
-        enable_progress_bar=False,
-        val_check_interval=0.25,  # 4x during an epoch.
+        enable_progress_bar=True,
+        val_check_interval=1.0,  # 4x during an epoch.
         callbacks=[checkpoint_callback_f1, early_stopping_callback],
     )
 
@@ -197,17 +203,22 @@ if __name__ == "__main__":
     if len(config["data"]["antennas_test"]) > 0:
         ds_test = filter_antennas(ds_test, config["data"]["antennas_test"])
 
-    ds_t = EcallistoDatasetBinary(
+    ds_test = EcallistoDatasetBinary(
         ds_test,
         resize_func=resize_func,
-        normalization_transform=preprocess_spectrogram,
+        normalization_transform=remove_background,
     )
     # Create dataloader
     test_dataloader = DataLoader(
-        ds_t,
+        ds_test,
         batch_size=config["general"]["batch_size"],
-        num_workers=os.cpu_count(),
+        num_workers=8,
         shuffle=False,
         persistent_workers=False,
     )
     trainer.test(model, test_dataloader, ckpt_path="best")
+
+    # Clean up data
+    ds_test.clean_up()
+    ds_train.clean_up()
+    ds_valid.clean_up()

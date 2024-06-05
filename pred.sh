@@ -1,9 +1,8 @@
 #!/bin/sh
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1
-#SBATCH --job-name sweep_flaresense-v2
-#SBATCH --mem=32G
+#SBATCH --job-name flaresense-pred
+#SBATCH --mem=64G
 #SBATCH --gres=gpu:1
 #SBATCH --partition=p4500
 #SBATCH --out=logs/%j.out

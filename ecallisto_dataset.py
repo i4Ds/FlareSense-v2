@@ -1,5 +1,3 @@
-import random
-
 import numpy as np
 import torch
 from sklearn.utils.class_weight import compute_class_weight
@@ -7,11 +5,13 @@ from torch.utils.data import Dataset
 from torchvision.transforms.functional import pil_to_tensor
 from torchvision.transforms import Resize
 import torch
-from torchvision import transforms
-import os
 import pandas as pd
 import torch
 import torch.nn.functional as F
+import os
+from pathlib import Path
+from uuid import uuid4
+import shutil
 
 
 # Dataset
@@ -21,6 +21,8 @@ class EcallistoDataset(Dataset):
         dataset,
         resize_func,
         normalization_transform,
+        cache=True,
+        cache_base_dir="/tmp/vincenzo/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
     ):
@@ -32,23 +34,30 @@ class EcallistoDataset(Dataset):
         self.resize_func = resize_func
         self.dataset_label_weight = self.get_dataset_label_weight()
 
+        self.cache = cache
+        self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
+
     @staticmethod
-    def to_torch_tensor(example):
+    def image_to_torch_tensor(example):
         # Convert the example to a torch tensor
         if "file_path" in example:
             # It's a parquet file, containing a DF
             df = pd.read_parquet(example["file_path"])
-            example["image"] = torch.from_numpy(df.values.T).float()
+            image = torch.from_numpy(df.values.T).float()
         else:
-            example["image"] = pil_to_tensor(example["image"]).float()
-        example["label"] = torch.tensor(example["label"])
-        if not isinstance(example["datetime"], str):
-            example["datetime"] = str(example["datetime"])
-        return example
+            image = pil_to_tensor(example["image"]).float()
+        return image
 
     def __len__(self):
         """Function to return the number of records in the dataset"""
         return len(self.data)
+
+    def clean_up(self):
+        shutil.rmtree(self.cache_dir)
+        super().__del__()
+
+    def __del__(self):
+        self.clean_up()
 
     def get_labels(self):
         return self.get_dataset_labels()
@@ -71,47 +80,59 @@ class EcallistoDataset(Dataset):
         sample_weights = [class_weights[label] for label in labels]
         return sample_weights
 
+    def __create_cache_path(self, example):
+        return Path(
+            self.cache_dir,
+            example["antenna"],
+            example["datetime"] + ".torch",
+        )
+
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
-        example = self.to_torch_tensor(self.data[index])
+        example = self.data[index]
 
-        # Normalization
-        example["image"] = self.normalization_transform(example["image"])
+        # Type casting
+        if not isinstance(example["datetime"], str):
+            example["datetime"] = str(example["datetime"])
 
-        # Data aug
-        if self.augm_before_resize is not None:
-            example["image"] = self.augm_before_resize(example["image"])
+        # Caching
+        if self.cache:
+            example_image_path = self.__create_cache_path(example)
+            if os.path.exists(example_image_path):
+                image = torch.load(example_image_path)
+            else:
+                image = self.image_to_torch_tensor(example)
 
-        # Resize
-        example["image"] = self.resize_func(example["image"])
+                # Normalization
+                image = self.normalization_transform(image)
 
-        if self.augm_after_resize is not None:
-            example["image"] = self.augm_after_resize(example["image"])
+                # Data augmentation before resize
+                if self.augm_before_resize is not None:
+                    image = self.augm_before_resize(image)
 
-        # Returns all
+                # Resize
+                image = self.resize_func(image)
+
+                # Data augmentation after resize
+                if self.augm_after_resize is not None:
+                    image = self.augm_after_resize(image)
+
+                # Min max scaling
+                image = global_min_max_scale(image)
+
+                os.makedirs(os.path.dirname(example_image_path), exist_ok=True)
+                torch.save(image, example_image_path)
+
+        # Create example
+        example["label"] = torch.tensor(example["label"])
+        example["image"] = image
+
         return (
             example["image"].unsqueeze(0),
             example["label"],
             example["antenna"],
             example["datetime"],
         )
-
-    def save_image(self, image_tensor, antenna, datetime):
-        # Create a directory to save the image
-        save_dir = "saved_images"
-        os.makedirs(save_dir, exist_ok=True)
-
-        # Convert datetime to a filename-friendly format
-        datetime_str = datetime.replace(":", "-").replace(" ", "_")
-
-        # Define the filename
-        filename = f"{antenna}_{datetime_str}.png"
-        file_path = os.path.join(save_dir, filename)
-
-        # Convert the tensor to a PIL Image and save it
-        image = transforms.ToPILImage()(image_tensor)
-        image.save(file_path)
-        print(f"Image saved to {file_path}")
 
 
 class EcallistoDatasetBinary(EcallistoDataset):
@@ -209,7 +230,9 @@ class TimeWarpAugmenter:
         if self.W == 0:
             return specs
         if specs.size(-1) <= 2 * self.W:
-            print(f"Spec is too short to do time warping. Got: {specs.size(-1)}. Expected (min.): {2 * self.W + 1}")
+            print(
+                f"Spec is too short to do time warping. Got: {specs.size(-1)}. Expected (min.): {2 * self.W + 1}"
+            )
             return specs
         if not torch.is_tensor(specs):
             specs = torch.from_numpy(specs)
@@ -360,16 +383,6 @@ def global_min_max_scale(spectrogram):
     scaled_spectrogram = (spectrogram - min_value) / (max_value - min_value)
 
     return scaled_spectrogram
-
-
-def preprocess_spectrogram(spectrogram):
-    # Remove background
-    spectrogram = remove_background(spectrogram)
-
-    # Apply global Min-Max scaling
-    spectrogram = global_min_max_scale(spectrogram)
-
-    return spectrogram
 
 
 def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):

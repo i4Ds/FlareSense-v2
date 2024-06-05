@@ -1,12 +1,13 @@
 #!/bin/sh
-#SBATCH --time=12:00:00
+#SBATCH --time=01:00:00
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
-#SBATCH --job-name sweep_flaresense-v2
+#SBATCH --job-name clean_tmp-v2
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:0
 #SBATCH --partition=p4500
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 
-wandb agent vincenzo-timmel/FlareSense-v2/tnkcy9ek
+
+rm -rf /tmp/vincenzo/ecallisto
