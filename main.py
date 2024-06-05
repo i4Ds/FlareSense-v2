@@ -1,29 +1,22 @@
 # Modeling
 import argparse
+import os
+
 import torch
 import yaml
 from datasets import load_dataset
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
-import os
 from torchvision.transforms import Compose
 
 import wandb
-from ecallisto_dataset import (
-    randomly_reduce_class_samples,
-    filter_antennas,
-    CustomSpecAugment,
-    TimeWarpAugmenter,
-    EcallistoDatasetBinary,
-    remove_background,
-    custom_resize,
-)
-from ecallisto_model import (
-    ResNet,
-)
-
+from ecallisto_dataset import (CustomSpecAugment, EcallistoDatasetBinary,
+                               TimeWarpAugmenter, custom_resize,
+                               filter_antennas, randomly_reduce_class_samples,
+                               remove_background)
+from ecallisto_model import ResNet
 
 if __name__ == "__main__":
     print(f"PyTorch version {torch.__version__}")

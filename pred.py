@@ -1,17 +1,15 @@
-import wandb
+import pandas as pd
 import torch
 import yaml
-from ecallisto_model import ResNet
+from datasets import DatasetDict, load_dataset
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
 from tqdm import tqdm
-from datasets import DatasetDict, load_dataset
-import pandas as pd
-from ecallisto_dataset import (
-    EcallistoDatasetBinary,
-    custom_resize,
-    preprocess_spectrogram,
-)
+
+import wandb
+from ecallisto_dataset import (EcallistoDatasetBinary, custom_resize,
+                               preprocess_spectrogram)
+from ecallisto_model import ResNet
 
 
 def create_probs(model, dataloader, device):

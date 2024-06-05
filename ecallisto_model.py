@@ -1,15 +1,15 @@
 # Modeling
+# Visualization
+import matplotlib.pyplot as plt
+import seaborn as sns
 import torch
 import torch.nn.functional as F
 from pytorch_lightning import LightningModule
 from torchmetrics import ConfusionMatrix
-from torchmetrics.classification import Recall, Precision, F1Score
+from torchmetrics.classification import F1Score, Precision, Recall
 from torchvision import models
-import wandb
 
-# Visualization
-import matplotlib.pyplot as plt
-import seaborn as sns
+import wandb
 
 RESNET_DICT = {
     "resnet18": models.resnet18,

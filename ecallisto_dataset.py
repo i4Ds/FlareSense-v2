@@ -1,17 +1,18 @@
+import atexit
+import os
+import shutil
+import signal
+from pathlib import Path
+from uuid import uuid4
+
 import numpy as np
-import torch
-from sklearn.utils.class_weight import compute_class_weight
-from torch.utils.data import Dataset
-from torchvision.transforms.functional import pil_to_tensor
-from torchvision.transforms import Resize
-import torch
 import pandas as pd
 import torch
 import torch.nn.functional as F
-import os
-from pathlib import Path
-from uuid import uuid4
-import shutil
+from sklearn.utils.class_weight import compute_class_weight
+from torch.utils.data import Dataset
+from torchvision.transforms import Resize
+from torchvision.transforms.functional import pil_to_tensor
 
 
 # Dataset
@@ -34,8 +35,12 @@ class EcallistoDataset(Dataset):
         self.resize_func = resize_func
         self.dataset_label_weight = self.get_dataset_label_weight()
 
+        # Cleanup
         self.cache = cache
         self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
+        atexit.register(self.clean_up)
+        signal.signal(signal.SIGTERM, self.clean_up)
+        signal.signal(signal.SIGINT, self.clean_up)
 
     @staticmethod
     def image_to_torch_tensor(example):
@@ -54,7 +59,6 @@ class EcallistoDataset(Dataset):
 
     def clean_up(self):
         shutil.rmtree(self.cache_dir)
-        super().__del__()
 
     def __del__(self):
         self.clean_up()
