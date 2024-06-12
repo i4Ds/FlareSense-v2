@@ -177,7 +177,7 @@ if __name__ == "__main__":
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
         enable_progress_bar=True,
-        val_check_interval=1.0,  # 4x during an epoch.
+        val_check_interval=1.0,  # Every Epoch.
         callbacks=[checkpoint_callback_f1, early_stopping_callback],
     )
 
@@ -210,8 +210,3 @@ if __name__ == "__main__":
         persistent_workers=False,
     )
     trainer.test(model, test_dataloader, ckpt_path="best")
-
-    # Clean up data
-    ds_test.clean_up()
-    ds_train.clean_up()
-    ds_valid.clean_up()

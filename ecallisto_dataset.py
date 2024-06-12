@@ -58,7 +58,8 @@ class EcallistoDataset(Dataset):
         return len(self.data)
 
     def clean_up(self):
-        shutil.rmtree(self.cache_dir)
+        if os.path.exists(self.cache_dir):
+            shutil.rmtree(self.cache_dir)
 
     def __del__(self):
         self.clean_up()
@@ -133,7 +134,7 @@ class EcallistoDataset(Dataset):
 
         return (
             example["image"].unsqueeze(0),
-            example["label"],
+            example["label"].unsqueeze(0),
             example["antenna"],
             example["datetime"],
         )
@@ -161,10 +162,12 @@ class EcallistoDatasetBinary(EcallistoDataset):
         """Function to return samples corresponding to a given index from a dataset"""
         image, label, antenna, datetime = super().__getitem__(index)
 
+        label = label.squeeze(0)
+
         # Convert label to binary
         label = 0 if label.item() == 0 else 1
 
-        return image, torch.tensor(label), antenna, datetime
+        return image, torch.tensor(label).float().unsqueeze(0), antenna, datetime
 
     def get_labels(self):
         # Return binary labels: 0 if the label is 0, 1 otherwise
@@ -172,11 +175,11 @@ class EcallistoDatasetBinary(EcallistoDataset):
 
     def get_class_weights(self):
         labels = self.get_labels()
-        labels = np.where(labels != 0, 1, 0)
         cw = compute_class_weight(
             class_weight="balanced", classes=np.unique(labels), y=labels
         )
-        return cw
+        print(f"{cw.shape=}. {cw=}")
+        return cw[1]  # Binary
 
 
 class CustomSpecAugment:

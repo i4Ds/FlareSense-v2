@@ -33,7 +33,7 @@ class EcallistoBase(LightningModule):
         learning_rate,
     ):
         super().__init__()
-        assert n_classes >= 1, "You have 1 Class?"
+        assert n_classes >= 1, "You have 0 Classes?"
         if n_classes == 1:
             self.recall = Recall(task="binary")
             self.precision = Precision(task="binary")
