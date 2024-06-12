@@ -6,10 +6,10 @@ general:
   use_class_weights: True
 
 model:
-  model_type: resnet34
+  model_type: resnet18
   input_size: [224, 224]
   optimizer_name: adam
-  lr: 0.003963995956356682
+  lr: 0.0021418348849082266
 
 data:
   train_path: i4ds/radio-sunburst-ecallisto-paths-df-v2

@@ -33,7 +33,7 @@ class EcallistoBase(LightningModule):
         learning_rate,
     ):
         super().__init__()
-        assert n_classes >= 1, "You have 1 or 0 Classes?"
+        assert n_classes >= 1, "You have 1 Class?"
         if n_classes == 1:
             self.recall = Recall(task="binary")
             self.precision = Precision(task="binary")
@@ -52,13 +52,16 @@ class EcallistoBase(LightningModule):
             self.confmat = ConfusionMatrix(num_classes=n_classes, task="multiclass")
         self.class_weights = class_weights
         self.loss_function = (
-            F.cross_entropy if n_classes > 1 else F.binary_cross_entropy
+            F.cross_entropy if n_classes > 1 else F.binary_cross_entropy_with_logits
         )
         self.batch_size = batch_size
 
         # Optimizer
         self.optimizer_name = optimizer_name
         self.learning_rate = learning_rate
+
+        # List to save test results
+        self.x_test = []
 
     def training_step(self, batch, batch_idx):
         x, y, _, _ = batch

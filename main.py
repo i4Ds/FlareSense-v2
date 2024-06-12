@@ -163,7 +163,7 @@ if __name__ == "__main__":
     # Setup Model
     cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
     model = ResNet(
-        n_classes=2,  # Binary
+        n_classes=1,  # Binary
         resnet_type=config["model"]["model_type"],
         class_weights=(cw if config["general"]["use_class_weights"] else None),
         batch_size=config["general"]["batch_size"],
