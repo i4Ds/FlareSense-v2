@@ -12,10 +12,15 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision.transforms import Compose
 
 import wandb
-from ecallisto_dataset import (CustomSpecAugment, EcallistoDatasetBinary,
-                               TimeWarpAugmenter, custom_resize,
-                               filter_antennas, randomly_reduce_class_samples,
-                               remove_background)
+from ecallisto_dataset import (
+    CustomSpecAugment,
+    EcallistoDatasetBinary,
+    TimeWarpAugmenter,
+    custom_resize,
+    filter_antennas,
+    randomly_reduce_class_samples,
+    remove_background,
+)
 from ecallisto_model import ResNet
 
 if __name__ == "__main__":
@@ -176,7 +181,7 @@ if __name__ == "__main__":
         accelerator="gpu",
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
-        enable_progress_bar=True,
+        enable_progress_bar=False,
         val_check_interval=1.0,  # Every Epoch.
         callbacks=[checkpoint_callback_f1, early_stopping_callback],
     )
