@@ -33,3 +33,4 @@ data:
   simple_normalization: False
   use_augmentation: False
   freq_mask_param: 30
+  time_masking_para: 0

@@ -89,5 +89,6 @@ data:
   reduction_fraction: 0.2
   use_augmentation: True
   frequency_masking_para: 15
+  time_masking_para: 0
   freq_mask_method: max
   time_warp_w: 293

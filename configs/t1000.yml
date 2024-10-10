@@ -88,5 +88,6 @@ data:
   reduction_fraction: 0.2
   use_augmentation: True
   frequency_masking_para: 0
+  time_masking_para: 0
   freq_mask_method: random
   time_warp_w: 0

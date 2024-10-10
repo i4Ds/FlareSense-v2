@@ -5,6 +5,7 @@ import signal
 from pathlib import Path
 from uuid import uuid4
 
+
 import numpy as np
 import pandas as pd
 import torch
@@ -183,40 +184,63 @@ class EcallistoDatasetBinary(EcallistoDataset):
 
 
 class CustomSpecAugment:
-    def __init__(self, frequency_masking_para, method="max"):
+    def __init__(self, frequency_masking_para, time_masking_para, method="max"):
         self.frequency_masking_para = frequency_masking_para
+        self.time_masking_para = time_masking_para
         self.method = method
 
     def __call__(self, spectrogram):
-        if self.frequency_masking_para == 0:
+        if self.frequency_masking_para == 0 and self.time_masking_para == 0:
             return spectrogram
-        # Calculate per-row padding values based on the specified method
-        if self.method == "max":
-            padding_values = torch.max(spectrogram, dim=1).values
-        elif self.method == "min":
-            padding_values = torch.min(spectrogram, dim=1).values
-        elif self.method == "median":
-            padding_values = torch.median(spectrogram, dim=1).values
-        elif self.method == "mean":
-            padding_values = torch.mean(spectrogram, dim=1)
-        elif self.method == "random":
-            padding_values = torch.rand(spectrogram.size(0))
+
+        # Apply frequency masking if parameter is set
+        if self.frequency_masking_para > 0:
+            padding_values_freq = self.get_padding_values(
+                spectrogram, self.method, dim=1
+            )
+            spectrogram = self.frequency_mask(spectrogram, padding_values_freq)
+
+        # Apply time masking if parameter is set
+        if self.time_masking_para > 0:
+            padding_values_time = self.get_padding_values(
+                spectrogram, self.method, dim=0
+            )
+            spectrogram = self.time_mask(spectrogram, padding_values_time)
+
+        return spectrogram
+
+    def get_padding_values(self, spectrogram, method, dim):
+        if method == "max":
+            padding_values = torch.max(spectrogram, dim=dim).values
+        elif method == "min":
+            padding_values = torch.min(spectrogram, dim=dim).values
+        elif method == "median":
+            padding_values = torch.median(spectrogram, dim=dim).values
+        elif method == "mean":
+            padding_values = torch.mean(spectrogram, dim=dim)
+        elif method == "random":
+            size = spectrogram.size(dim)
+            padding_values = torch.rand(size)
         else:
             raise ValueError(
                 "Invalid method parameter. Choose from 'max', 'min', 'median', 'mean', or 'random'."
             )
-
-        # Apply frequency masking
-        spectrogram = self.frequency_mask(spectrogram, padding_values)
-        return spectrogram
+        return padding_values
 
     def frequency_mask(self, spectrogram, padding_values):
         num_mel_channels = spectrogram.size(0)
-        mask_param = torch.randint(0, self.frequency_masking_para, (1,)).item()
-
-        f = torch.randint(0, num_mel_channels - mask_param, (1,)).item()
+        mask_param = torch.randint(0, self.frequency_masking_para + 1, (1,)).item()
+        f = torch.randint(0, num_mel_channels - mask_param + 1, (1,)).item()
         mask_value = padding_values[f]
         spectrogram[f : f + mask_param, :] = mask_value
+        return spectrogram
+
+    def time_mask(self, spectrogram, padding_values):
+        time_steps = spectrogram.size(1)
+        mask_param = torch.randint(0, self.time_masking_para + 1, (1,)).item()
+        t = torch.randint(0, time_steps - mask_param + 1, (1,)).item()
+        mask_value = padding_values[t]
+        spectrogram[:, t : t + mask_param] = mask_value
         return spectrogram
 
 

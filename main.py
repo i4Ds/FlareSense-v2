@@ -100,6 +100,7 @@ if __name__ == "__main__":
         augm_before_resize = TimeWarpAugmenter(W=config["data"]["time_warp_w"])
         augm_after_resize = CustomSpecAugment(
             frequency_masking_para=config["data"]["frequency_masking_para"],
+            time_masking_para=config["data"]["time_masking_para"],
             method=config["data"]["freq_mask_method"],
         )
     else:
