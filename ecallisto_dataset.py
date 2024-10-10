@@ -20,28 +20,35 @@ from torchvision.transforms.functional import pil_to_tensor
 class EcallistoDataset(Dataset):
     def __init__(
         self,
-        dataset,
-        resize_func,
-        normalization_transform,
+        dataset=None,
+        resize_func=None,
+        normalization_transform=None,
         cache=True,
         cache_base_dir="/tmp/vincenzo/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
     ):
+        if dataset is None:
+            print(
+                f"Warning: dataset is None. This is OK if you are using this class for inference."
+            )
         super().__init__()
         self.data = dataset
         self.normalization_transform = normalization_transform
         self.augm_before_resize = augm_before_resize
         self.augm_after_resize = augm_after_resize
         self.resize_func = resize_func
-        self.dataset_label_weight = self.get_dataset_label_weight()
 
-        # Cleanup
-        self.cache = cache
-        self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
-        atexit.register(self.clean_up)
-        signal.signal(signal.SIGTERM, self.clean_up)
-        signal.signal(signal.SIGINT, self.clean_up)
+        # Process, if dataset is availble
+        if self.data is not None:
+            self.dataset_label_weight = self.get_dataset_label_weight()
+
+            # Cleanup
+            self.cache = cache
+            self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
+            atexit.register(self.clean_up)
+            signal.signal(signal.SIGTERM, self.clean_up)
+            signal.signal(signal.SIGINT, self.clean_up)
 
     @staticmethod
     def image_to_torch_tensor(example):
@@ -58,7 +65,7 @@ class EcallistoDataset(Dataset):
         """Function to return the number of records in the dataset"""
         return len(self.data)
 
-    def clean_up(self):
+    def clean_up(self, *args, **kwargs):
         if os.path.exists(self.cache_dir):
             shutil.rmtree(self.cache_dir)
 
@@ -92,6 +99,29 @@ class EcallistoDataset(Dataset):
             example["antenna"],
             example["datetime"] + ".torch",
         )
+    
+    def preprocess_image(self, example):
+        # Convert the example to a torch tensor
+        image = self.image_to_torch_tensor(example)
+
+        # Normalization
+        image = self.normalization_transform(image)
+
+        # Data augmentation before resize
+        if self.augm_before_resize is not None:
+            image = self.augm_before_resize(image)
+
+        # Resize
+        image = self.resize_func(image)
+
+        # Data augmentation after resize
+        if self.augm_after_resize is not None:
+            image = self.augm_after_resize(image)
+
+        # Min-max scaling
+        image = global_min_max_scale(image)
+
+        return image
 
     def __getitem__(self, index):
         """Function to return samples corresponding to a given index from a dataset"""
@@ -107,27 +137,11 @@ class EcallistoDataset(Dataset):
             if os.path.exists(example_image_path):
                 image = torch.load(example_image_path)
             else:
-                image = self.image_to_torch_tensor(example)
-
-                # Normalization
-                image = self.normalization_transform(image)
-
-                # Data augmentation before resize
-                if self.augm_before_resize is not None:
-                    image = self.augm_before_resize(image)
-
-                # Resize
-                image = self.resize_func(image)
-
-                # Data augmentation after resize
-                if self.augm_after_resize is not None:
-                    image = self.augm_after_resize(image)
-
-                # Min max scaling
-                image = global_min_max_scale(image)
-
+                image = self.preprocess_image(example)
                 os.makedirs(os.path.dirname(example_image_path), exist_ok=True)
                 torch.save(image, example_image_path)
+        else:
+            image = self.preprocess_image(example)
 
         # Create example
         example["label"] = torch.tensor(example["label"])
@@ -144,9 +158,9 @@ class EcallistoDataset(Dataset):
 class EcallistoDatasetBinary(EcallistoDataset):
     def __init__(
         self,
-        dataset,
-        resize_func,
-        normalization_transform,
+        dataset=None,
+        resize_func=None,
+        normalization_transform=None,
         augm_before_resize=None,
         augm_after_resize=None,
     ):
