@@ -21,6 +21,9 @@ parameters:
       frequency_masking_para:
         max: 80
         min: 0
+      time_masking_para:
+        max: 80
+        min: 0
       time_warp_w:
         max: 1500
         min: 0
