@@ -99,7 +99,7 @@ class EcallistoDataset(Dataset):
             example["antenna"],
             example["datetime"] + ".torch",
         )
-    
+
     def preprocess_image(self, example):
         # Convert the example to a torch tensor
         image = self.image_to_torch_tensor(example)
@@ -209,37 +209,32 @@ class CustomSpecAugment:
 
         # Apply frequency masking if parameter is set
         if self.frequency_masking_para > 0:
-            padding_values_freq = self.get_padding_values(
-                spectrogram, self.method, dim=1
-            )
+            padding_values_freq = self.get_padding_values(spectrogram, self.method)
             spectrogram = self.frequency_mask(spectrogram, padding_values_freq)
 
         # Apply time masking if parameter is set
         if self.time_masking_para > 0:
-            padding_values_time = self.get_padding_values(
-                spectrogram, self.method, dim=0
-            )
+            padding_values_time = self.get_padding_values(spectrogram, self.method)
             spectrogram = self.time_mask(spectrogram, padding_values_time)
 
         return spectrogram
 
-    def get_padding_values(self, spectrogram, method, dim):
+    def get_padding_value(self, spectrogram, method):
         if method == "max":
-            padding_values = torch.max(spectrogram, dim=dim).values
+            padding_value = torch.max(spectrogram).item()
         elif method == "min":
-            padding_values = torch.min(spectrogram, dim=dim).values
+            padding_value = torch.min(spectrogram).item()
         elif method == "median":
-            padding_values = torch.median(spectrogram, dim=dim).values
+            padding_value = torch.median(spectrogram).item()
         elif method == "mean":
-            padding_values = torch.mean(spectrogram, dim=dim)
+            padding_value = torch.mean(spectrogram).item()
         elif method == "random":
-            size = spectrogram.size(dim)
-            padding_values = torch.rand(size)
+            padding_value = torch.rand(1).item()
         else:
             raise ValueError(
                 "Invalid method parameter. Choose from 'max', 'min', 'median', 'mean', or 'random'."
             )
-        return padding_values
+        return padding_value
 
     def frequency_mask(self, spectrogram, padding_values):
         num_mel_channels = spectrogram.size(0)
