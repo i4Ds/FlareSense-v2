@@ -31,6 +31,7 @@ class EcallistoBase(LightningModule):
         batch_size,
         optimizer_name,
         learning_rate,
+        label_smoothing=0.0,
     ):
         super().__init__()
         assert n_classes >= 1, "You have 0 Classes?"
@@ -51,9 +52,14 @@ class EcallistoBase(LightningModule):
             )
             self.confmat = ConfusionMatrix(num_classes=n_classes, task="multiclass")
         self.class_weights = class_weights
+        self.label_smoothing = label_smoothing
+        """
         self.loss_function = (
             F.cross_entropy if n_classes > 1 else F.binary_cross_entropy_with_logits
         )
+        """
+        # Simplyfied pipeline, we are only looking at binary currently.
+        self.loss_fucntion = F.binary_cross_entropy_with_logits
         self.batch_size = batch_size
 
         # Optimizer
@@ -77,7 +83,27 @@ class EcallistoBase(LightningModule):
         )
         return loss
 
+    def apply_label_smoothing(targets, smoothing):
+        """
+        Apply label smoothing to binary targets.
+
+        Args:
+            targets (torch.Tensor): Tensor of shape (N,) with binary labels (0 or 1).
+            smoothing (float): Smoothing factor between 0 and 1.
+
+        Returns:
+            torch.Tensor: Smoothed targets.
+        """
+        # Ensure targets are floats
+        targets = targets.float().to(targets.device)
+        # Apply label smoothing
+        smoothed_targets = targets * (1.0 - smoothing) + (1.0 - targets) * smoothing
+        return smoothed_targets
+
     def _loss(self, y_hat, y):
+        # Apply label smoothing if needed
+        if self.label_smoothing > 0:
+            y = self.apply_label_smoothing(y)
         if self.class_weights is not None:
             loss = self.loss_function(y_hat, y, weight=self.class_weights.to(y.device))
         else:
@@ -213,6 +239,7 @@ class ResNet(EcallistoBase):
         resnet_type,
         optimizer_name,
         learning_rate,
+        label_smooting,
         class_weights=None,
         batch_size=None,
         model_weights=None,
@@ -223,6 +250,7 @@ class ResNet(EcallistoBase):
             batch_size=batch_size,
             optimizer_name=optimizer_name,
             learning_rate=learning_rate,
+            label_smooting=label_smooting,
         )
         self.resnet = RESNET_DICT[resnet_type](
             weights=model_weights, num_classes=n_classes

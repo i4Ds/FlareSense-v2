@@ -10,6 +10,7 @@ model:
   input_size: [224, 224]
   optimizer_name: adam
   lr: 0.004307641758212711
+  label_smoothing: 0.0
 
 data:
   train_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
