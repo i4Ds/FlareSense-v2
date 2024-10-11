@@ -12,15 +12,13 @@ parameters:
       lr:
         max: 1.0e-2
         min: 1.0e-6
-      model_type:
-        values: [resnet18, resnet34]
       label_smooting:
         max: 0.4
         min: 0.0
   data:
     parameters:
       freq_mask_method:
-        values: [mean, random, max]
+        values: [mean, random, max, min]
       frequency_masking_para:
         max: 80
         min: 0
@@ -37,4 +35,4 @@ command:
   - ${interpreter}
   - ${program}
   - "--config"
-  - "configs/t1001.yml" #Insert your model here (do not push it, adapt it each time.)
+  - "configs/relabel_test_only.yml" #Insert your model here (do not push it, adapt it each time.)

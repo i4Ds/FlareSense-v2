@@ -1,0 +1,32 @@
+general:
+  batch_size: 32
+  max_epochs: 20
+  binary: True
+  use_random_sampler: False
+  use_class_weights: True
+
+model:
+  model_type: resnet18
+  input_size: [224, 224]
+  optimizer_name: adam
+  lr: 0.0021418348849082266
+  label_smoothing: 0.0
+
+data:
+  train_path: i4ds/radio-sunburst-ecallisto-paths-df-v2-TEST-SET-SPLIT
+  train_split: train
+  val_path: i4ds/radio-sunburst-ecallisto-paths-df-v2-TEST-SET-SPLIT
+  val_split: validation
+  test_path: i4ds/radio-sunburst-ecallisto-paths-df-v2-TEST-SET-SPLIT
+  test_split: validation
+  antennas_train: []
+  antennas_val: []
+  antennas_test: []
+  reduce_non_burst: False
+  train_class_to_reduce: 0
+  reduction_fraction: 0.2
+  use_augmentation: True
+  frequency_masking_para: 15
+  time_masking_para: 0
+  freq_mask_method: max
+  time_warp_w: 293
