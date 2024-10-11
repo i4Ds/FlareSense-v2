@@ -59,7 +59,7 @@ class EcallistoBase(LightningModule):
         )
         """
         # Simplyfied pipeline, we are only looking at binary currently.
-        self.loss_fucntion = F.binary_cross_entropy_with_logits
+        self.loss_function = F.binary_cross_entropy_with_logits
         self.batch_size = batch_size
 
         # Optimizer
@@ -239,7 +239,7 @@ class ResNet(EcallistoBase):
         resnet_type,
         optimizer_name,
         learning_rate,
-        label_smooting,
+        label_smoothing,
         class_weights=None,
         batch_size=None,
         model_weights=None,
@@ -250,7 +250,7 @@ class ResNet(EcallistoBase):
             batch_size=batch_size,
             optimizer_name=optimizer_name,
             learning_rate=learning_rate,
-            label_smooting=label_smooting,
+            label_smoothing=label_smoothing,
         )
         self.resnet = RESNET_DICT[resnet_type](
             weights=model_weights, num_classes=n_classes

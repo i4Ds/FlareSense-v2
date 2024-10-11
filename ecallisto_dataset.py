@@ -209,12 +209,12 @@ class CustomSpecAugment:
 
         # Apply frequency masking if parameter is set
         if self.frequency_masking_para > 0:
-            padding_values_freq = self.get_padding_values(spectrogram, self.method)
+            padding_values_freq = self.get_padding_value(spectrogram, self.method)
             spectrogram = self.frequency_mask(spectrogram, padding_values_freq)
 
         # Apply time masking if parameter is set
         if self.time_masking_para > 0:
-            padding_values_time = self.get_padding_values(spectrogram, self.method)
+            padding_values_time = self.get_padding_value(spectrogram, self.method)
             spectrogram = self.time_mask(spectrogram, padding_values_time)
 
         return spectrogram
@@ -240,16 +240,14 @@ class CustomSpecAugment:
         num_mel_channels = spectrogram.size(0)
         mask_param = torch.randint(0, self.frequency_masking_para + 1, (1,)).item()
         f = torch.randint(0, num_mel_channels - mask_param + 1, (1,)).item()
-        mask_value = padding_values[f]
-        spectrogram[f : f + mask_param, :] = mask_value
+        spectrogram[f : f + mask_param, :] = padding_values
         return spectrogram
 
     def time_mask(self, spectrogram, padding_values):
         time_steps = spectrogram.size(1)
         mask_param = torch.randint(0, self.time_masking_para + 1, (1,)).item()
         t = torch.randint(0, time_steps - mask_param + 1, (1,)).item()
-        mask_value = padding_values[t]
-        spectrogram[:, t : t + mask_param] = mask_value
+        spectrogram[:, t : t + mask_param] = padding_values
         return spectrogram
 
 

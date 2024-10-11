@@ -12,7 +12,7 @@ parameters:
       lr:
         max: 1.0e-2
         min: 1.0e-6
-      label_smooting:
+      label_smoothing:
         max: 0.4
         min: 0.0
   data:

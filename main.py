@@ -175,7 +175,7 @@ if __name__ == "__main__":
         batch_size=config["general"]["batch_size"],
         optimizer_name=config["model"]["optimizer_name"],
         learning_rate=config["model"]["lr"],
-        label_smooting=config["model"]["label_smoothing"],
+        label_smoothing=config["model"]["label_smoothing"],
     )
 
     # Trainer
