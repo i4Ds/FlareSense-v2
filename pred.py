@@ -134,12 +134,10 @@ def main(checkpoint_reference, config):
 
     # Predict probabilities
     df_val["pred"] = create_logits(model, val_dataloader, device)
-    df_test["pred"] = create_logits(model, test_dataloader, device)
-    df_train["pred"] = create_logits(model, train_dataloader, device)
-
-    # Save to CSV
     df_val.to_csv(f"{artifact.digest}_val.csv")
+    df_test["pred"] = create_logits(model, test_dataloader, device)
     df_test.to_csv(f"{artifact.digest}_test.csv")
+    df_train["pred"] = create_logits(model, train_dataloader, device)
     df_train.to_csv(f"{artifact.digest}_train.csv")
 
 
