@@ -7,23 +7,25 @@ from torchvision.transforms import Compose
 from tqdm import tqdm
 
 import wandb
-from ecallisto_dataset import (EcallistoDatasetBinary, custom_resize,
-                               preprocess_spectrogram)
+from ecallisto_dataset import (
+    EcallistoDatasetBinary,
+    custom_resize,
+    remove_background,
+)
 from ecallisto_model import ResNet
 
 
-def create_probs(model, dataloader, device):
+def create_logits(model: ResNet, dataloader, device):
     model.eval()  # Ensure the model is in evaluation mode
     model.to(device)  # Send the model to the appropriate device
-    class_1_prob = []
+    binay_logits = []
 
     with torch.no_grad():
         for inputs, _, _, _ in tqdm(dataloader):
-            y_hat = model(inputs.to(device))
-            probs, _ = model.calculate_prediction(y_hat)
-            class_1_prob.extend(probs[:, 1].detach().cpu().tolist())
+            y_hat = model(inputs.to(device)).squeeze(dim=1)
+            binay_logits.extend(y_hat.cpu().tolist())
 
-    return class_1_prob
+    return binay_logits
 
 
 def load_model(checkpoint_path, config_path, device):
@@ -32,10 +34,11 @@ def load_model(checkpoint_path, config_path, device):
         config = yaml.safe_load(file)
     # Initialize the model
     model = ResNet(
-        2,
+        1,
         resnet_type=config["model"]["model_type"],
         optimizer_name="adam",
         learning_rate=1000,
+        label_smoothing=0.0,
     )
 
     # Load checkpoint
@@ -46,9 +49,15 @@ def load_model(checkpoint_path, config_path, device):
 
 
 def prepare_datasets(config):
-    ds_train = load_dataset(config["data"]["train_path"], split="train")
-    ds_valid = load_dataset(config["data"]["val_path"], split="validation")
-    ds_test = load_dataset(config["data"]["test_path"], split="test")
+    ds_train = load_dataset(
+        config["data"]["train_path"], split=config["data"]["train_split"]
+    )
+    ds_valid = load_dataset(
+        config["data"]["val_path"], split=config["data"]["val_split"]
+    )
+    ds_test = load_dataset(
+        config["data"]["test_path"], split=config["data"]["test_split"]
+    )
 
     dd = DatasetDict()
     dd["train"] = ds_train
@@ -65,17 +74,17 @@ def prepare_ecallisto_datasets(dd, config):
     ds_train = EcallistoDatasetBinary(
         dd["train"],
         resize_func=resize_func,
-        normalization_transform=preprocess_spectrogram,
+        normalization_transform=remove_background,
     )
     ds_valid = EcallistoDatasetBinary(
         dd["validation"],
         resize_func=resize_func,
-        normalization_transform=preprocess_spectrogram,
+        normalization_transform=remove_background,
     )
     ds_test = EcallistoDatasetBinary(
         dd["test"],
         resize_func=resize_func,
-        normalization_transform=preprocess_spectrogram,
+        normalization_transform=remove_background,
     )
 
     return ds_train, ds_valid, ds_test
@@ -124,15 +133,17 @@ def main(checkpoint_reference, config):
     )
 
     # Predict probabilities
-    # df_val["pred"] = create_probs(model, val_dataloader, device)
-    df_test["pred"] = create_probs(model, test_dataloader, device)
-    # df_train["pred"] = create_probs(model, train_dataloader, device)
+    df_val["pred"] = create_logits(model, val_dataloader, device)
+    df_test["pred"] = create_logits(model, test_dataloader, device)
+    df_train["pred"] = create_logits(model, train_dataloader, device)
 
     # Save to CSV
-    # df_val.to_csv(f"{artifact.digest}_val.csv")
+    df_val.to_csv(f"{artifact.digest}_val.csv")
     df_test.to_csv(f"{artifact.digest}_test.csv")
-    # df_train.to_csv(f"{artifact.digest}_train.csv")
+    df_train.to_csv(f"{artifact.digest}_train.csv")
 
 
 if __name__ == "__main__":
-    main("vincenzo-timmel/FlareSense-v2/best_model:v233", "configs/t1001.yml")
+    main(
+        "vincenzo-timmel/FlareSense-v2/best_model:v391", "configs/relabel_test_only.yml"
+    )
