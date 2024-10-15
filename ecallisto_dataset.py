@@ -100,26 +100,18 @@ class EcallistoDataset(Dataset):
             example["datetime"] + ".torch",
         )
 
-    def preprocess_image(self, example):
-        # Convert the example to a torch tensor
-        image = self.image_to_torch_tensor(example)
-
-        # Normalization
-        image = self.normalization_transform(image)
-
+    def augment_image(self, image):
         # Data augmentation before resize
         if self.augm_before_resize is not None:
             image = self.augm_before_resize(image)
 
         # Resize
-        image = self.resize_func(image)
+        if self.resize_func is not None:
+            image = self.resize_func(image)
 
         # Data augmentation after resize
         if self.augm_after_resize is not None:
             image = self.augm_after_resize(image)
-
-        # Min-max scaling
-        image = global_min_max_scale(image)
 
         return image
 
@@ -132,16 +124,18 @@ class EcallistoDataset(Dataset):
             example["datetime"] = str(example["datetime"])
 
         # Caching
-        if self.cache:
-            example_image_path = self.__create_cache_path(example)
-            if os.path.exists(example_image_path):
-                image = torch.load(example_image_path)
-            else:
-                image = self.preprocess_image(example)
+        example_image_path = self.__create_cache_path(example)
+        if not self.cache or not os.path.exists(example_image_path):
+            image = self.image_to_torch_tensor(example)
+            image = self.normalization_transform(image)
+            if self.cache:
                 os.makedirs(os.path.dirname(example_image_path), exist_ok=True)
                 torch.save(image, example_image_path)
         else:
-            image = self.preprocess_image(example)
+            image = torch.load(example_image_path)
+
+        # Min max scale image
+        image = global_min_max_scale(image)
 
         # Create example
         example["label"] = torch.tensor(example["label"])
