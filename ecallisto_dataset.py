@@ -24,6 +24,7 @@ class EcallistoDataset(Dataset):
         resize_func=None,
         normalization_transform=None,
         cache=True,
+        delete_cache=True,
         cache_base_dir="/tmp/vincenzo/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
@@ -45,10 +46,12 @@ class EcallistoDataset(Dataset):
 
             # Cleanup
             self.cache = cache
+            self.delete_cache = delete_cache
             self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
-            atexit.register(self.clean_up)
-            signal.signal(signal.SIGTERM, self.clean_up)
-            signal.signal(signal.SIGINT, self.clean_up)
+            if self.delete_cache:
+                atexit.register(self.clean_up)
+                signal.signal(signal.SIGTERM, self.clean_up)
+                signal.signal(signal.SIGINT, self.clean_up)
 
     @staticmethod
     def image_to_torch_tensor(example):
@@ -93,7 +96,7 @@ class EcallistoDataset(Dataset):
         sample_weights = [class_weights[label] for label in labels]
         return sample_weights
 
-    def __create_cache_path(self, example):
+    def create_cache_path(self, example):
         return Path(
             self.cache_dir,
             example["antenna"],
@@ -124,7 +127,7 @@ class EcallistoDataset(Dataset):
             example["datetime"] = str(example["datetime"])
 
         # Caching
-        example_image_path = self.__create_cache_path(example)
+        example_image_path = self.create_cache_path(example)
         if not self.cache or not os.path.exists(example_image_path):
             image = self.image_to_torch_tensor(example)
             image = self.normalization_transform(image)
@@ -133,6 +136,9 @@ class EcallistoDataset(Dataset):
                 torch.save(image, example_image_path)
         else:
             image = torch.load(example_image_path)
+
+        # Augmentation
+        image = self.augment_image(image)
 
         # Min max scale image
         image = global_min_max_scale(image)
@@ -143,6 +149,73 @@ class EcallistoDataset(Dataset):
 
         return (
             example["image"].unsqueeze(0),
+            example["label"].unsqueeze(0),
+            example["antenna"],
+            example["datetime"],
+        )
+
+
+class EcallistoBarlowDataset(EcallistoDataset):
+    def __init__(
+        self,
+        dataset=None,
+        resize_func=None,
+        normalization_transform=None,
+        cache=True,
+        delete_cache=True,
+        cache_base_dir="/tmp/vincenzo/ecallisto",
+        augm_before_resize=None,
+        augm_after_resize=None,
+    ):
+        # Call the parent class constructor
+        super().__init__(
+            dataset=dataset,
+            resize_func=resize_func,
+            normalization_transform=normalization_transform,
+            cache=cache,
+            delete_cache=delete_cache,
+            cache_base_dir=cache_base_dir,
+            augm_before_resize=augm_before_resize,
+            augm_after_resize=augm_after_resize,
+        )
+
+    def __getitem__(self, index):
+        """Function to return samples corresponding to a given index from the dataset"""
+        example = self.data[index]
+
+        # Type casting
+        if not isinstance(example["datetime"], str):
+            example["datetime"] = str(example["datetime"])
+
+        # Caching
+        example_image_path = self.create_cache_path(example)
+        if not self.cache or not os.path.exists(example_image_path):
+            image = self.image_to_torch_tensor(example)
+            image = self.normalization_transform(image)
+            if self.cache:
+                os.makedirs(os.path.dirname(example_image_path), exist_ok=True)
+                torch.save(image, example_image_path)
+        else:
+            image = torch.load(example_image_path)
+
+        image: torch.Tensor
+
+        # Augment the image twice
+        image_aug1 = self.augment_image(image.clone())
+        image_aug2 = self.augment_image(image.clone())
+
+        # Min-max scale the augmented images
+        image_aug1 = global_min_max_scale(image_aug1)
+        image_aug2 = global_min_max_scale(image_aug2)
+
+        # Prepare the output example
+        example["label"] = torch.tensor(example["label"])
+        example["image1"] = image_aug1
+        example["image2"] = image_aug2
+
+        return (
+            example["image1"].unsqueeze(0),
+            example["image2"].unsqueeze(0),
             example["label"].unsqueeze(0),
             example["antenna"],
             example["datetime"],

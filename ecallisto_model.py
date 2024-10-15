@@ -14,7 +14,7 @@ import wandb
 RESNET_DICT = {
     "resnet18": models.resnet18,
     "resnet34": models.resnet34,
-    "resnet52": models.resnet50,
+    "resnet50": models.resnet50,
 }
 
 OPTIMIZERS = {
@@ -31,6 +31,7 @@ class EcallistoBase(LightningModule):
         batch_size,
         optimizer_name,
         learning_rate,
+        weight_decay,
         label_smoothing=0.0,
     ):
         super().__init__()
@@ -65,6 +66,7 @@ class EcallistoBase(LightningModule):
         # Optimizer
         self.optimizer_name = optimizer_name
         self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
 
         # List to save test results
         self.x_test = []
@@ -228,7 +230,9 @@ class EcallistoBase(LightningModule):
 
     def configure_optimizers(self):
         return OPTIMIZERS[self.optimizer_name](
-            params=self.parameters(), lr=self.learning_rate, eps=1e-6
+            params=self.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
         )
 
 
@@ -239,6 +243,7 @@ class ResNet(EcallistoBase):
         resnet_type,
         optimizer_name,
         learning_rate,
+        weight_decay,
         label_smoothing,
         class_weights=None,
         batch_size=None,
@@ -250,6 +255,7 @@ class ResNet(EcallistoBase):
             batch_size=batch_size,
             optimizer_name=optimizer_name,
             learning_rate=learning_rate,
+            weight_decay=weight_decay,
             label_smoothing=label_smoothing,
         )
         self.resnet = RESNET_DICT[resnet_type](

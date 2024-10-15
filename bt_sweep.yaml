@@ -1,0 +1,50 @@
+program: barlow_twins.py
+method: bayes
+project: FlareSense-Barlow-Twins
+entity: vincenzo-timmel
+metric:
+  name: val_barlow_loss
+  goal: minimize
+
+parameters:
+  general:
+    parameters:
+      batch_size:
+        values: [128, 256, 1024]
+
+  model:
+    parameters:
+      model_type:
+        values: [resnet18, resnet34, resnet50]
+      lambda_bt:
+        max: 0.01
+        min: 0.001
+      lr:
+        max: 1.0e-3
+        min: 1.0e-5
+      warmup_lr:
+        max: 5
+        min: 1
+      weight_decay:
+        max: 1.0e-4
+        min: 1.0e-6
+
+  data:
+    parameters:
+      frequency_masking_para:
+        max: 80
+        min: 10
+      time_masking_para:
+        max: 80
+        min: 10
+      freq_mask_method:
+        values: [mean, random, max]
+      time_warp_w:
+        max: 1500
+        min: 500
+
+command:
+  - ${interpreter}
+  - ${program}
+  - "--config"
+  - "configs/barlow_test.yml"  # Modify as needed

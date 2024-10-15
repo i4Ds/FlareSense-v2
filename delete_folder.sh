@@ -1,7 +1,5 @@
 #!/bin/sh
 #SBATCH --time=01:00:00
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1
 #SBATCH --job-name clean_tmp-v2
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:0
