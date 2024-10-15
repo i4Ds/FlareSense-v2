@@ -16,6 +16,10 @@ parameters:
     parameters:
       model_type:
         values: [resnet18, resnet34, resnet50]
+      hidden_dim:
+        values: [512, 1024, 2048]  # Reduced range to prevent parameter explosion
+      projection_dim:
+        values: [128, 256, 512]    # Added projection_dim with reasonable values
       lambda_bt:
         max: 0.01
         min: 0.001

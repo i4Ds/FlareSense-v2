@@ -8,4 +8,4 @@
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 
-wandb agent vincenzo-timmel/FlareSense-Barlow-Twins/d53x3hjd
+wandb agent vincenzo-timmel/FlareSense-Barlow-Twins/gcb9kdgj
