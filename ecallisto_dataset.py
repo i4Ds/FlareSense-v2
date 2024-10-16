@@ -5,7 +5,6 @@ import signal
 from pathlib import Path
 from uuid import uuid4
 
-
 import numpy as np
 import pandas as pd
 import torch
@@ -24,7 +23,7 @@ class EcallistoDataset(Dataset):
         resize_func=None,
         normalization_transform=None,
         cache=True,
-        delete_cache=True,
+        delete_cache_after_run=True,
         cache_base_dir="/tmp/vincenzo/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
@@ -46,9 +45,9 @@ class EcallistoDataset(Dataset):
 
             # Cleanup
             self.cache = cache
-            self.delete_cache = delete_cache
+            self.delete_cache_after_run = delete_cache_after_run
             self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
-            if self.delete_cache:
+            if self.delete_cache_after_run:
                 atexit.register(self.clean_up)
                 signal.signal(signal.SIGTERM, self.clean_up)
                 signal.signal(signal.SIGINT, self.clean_up)
@@ -162,7 +161,7 @@ class EcallistoBarlowDataset(EcallistoDataset):
         resize_func=None,
         normalization_transform=None,
         cache=True,
-        delete_cache=True,
+        delete_cache_after_run=True,
         cache_base_dir="/tmp/vincenzo/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
@@ -173,7 +172,7 @@ class EcallistoBarlowDataset(EcallistoDataset):
             resize_func=resize_func,
             normalization_transform=normalization_transform,
             cache=cache,
-            delete_cache=delete_cache,
+            delete_cache_after_run=delete_cache_after_run,
             cache_base_dir=cache_base_dir,
             augm_before_resize=augm_before_resize,
             augm_after_resize=augm_after_resize,

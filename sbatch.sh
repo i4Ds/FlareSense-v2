@@ -8,4 +8,4 @@
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 
-wandb agent vincenzo-timmel/FlareSense-Barlow-Twins/gcb9kdgj
+srun python barlow_twins.py --config configs/barlow_test.yml

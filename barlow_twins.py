@@ -1,35 +1,28 @@
-import torch
-
-# Modeling
-# Visualization
-import torch
-from pytorch_lightning import LightningModule
-import torch
-import torch.nn as nn
-from pytorch_lightning import LightningModule
-from torchvision import models
-
-import wandb
-
 # Modeling
 import argparse
 import os
 
+import numpy as np
+# Modeling
+# Visualization
 import torch
+import torch.nn as nn
 import yaml
 from datasets import load_dataset
-from pytorch_lightning import Trainer
+from lightning.pytorch.callbacks import LearningRateMonitor
+from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 from torch.utils.data import DataLoader
+from torchvision import models
 from torchvision.transforms import Compose
-from ecallisto_dataset import (
-    CustomSpecAugment,
-    EcallistoBarlowDataset,
-    TimeWarpAugmenter,
-    custom_resize,
-    remove_background,
-)
+
+import wandb
+from ecallisto_dataset import (CustomSpecAugment, EcallistoBarlowDataset,
+                               TimeWarpAugmenter, custom_resize,
+                               remove_background)
 
 RESNET_DICT = {
     "resnet18": models.resnet18,
@@ -126,13 +119,17 @@ class ResNetBarlow(LightningModule):
 
         # Projection head as per Barlow Twins
         self.projector = nn.Sequential(
-            nn.Linear(in_features, projection_hidden_dim),
+            nn.Linear(in_features, projection_hidden_dim, bias=True),
             nn.BatchNorm1d(projection_hidden_dim),
             nn.ReLU(),
-            nn.Linear(projection_hidden_dim, projection_dim),
+            nn.Linear(projection_hidden_dim, projection_dim, bias=False),
         )
         # Hyperparameters for Barlow Twins loss
         self.lambda_bt = lambda_bt
+
+        ## Track some stuff
+        self.val_embeddings = []
+        self.val_labels = []
 
     def forward(self, x):
         """
@@ -154,28 +151,42 @@ class ResNetBarlow(LightningModule):
         return projections
 
     def validation_step(self, batch, batch_idx):
-        xt1, xt2, _, _, _ = batch
+        x, _, y, _, _ = batch
 
         # Pass through the model to get embeddings
-        z1 = self(xt1)
-        z2 = self(xt2)
+        z1 = self(x)
 
-        # Compute Barlow Twins loss
-        loss = barlow_twins_loss(
-            z1, z2, batch_size=self.batch_size, lambda_bt=self.lambda_bt
+        self.val_embeddings.append(z1.cpu())
+        self.val_labels.append(y.cpu())
+
+    def on_validation_epoch_end(self):
+        all_embeddings = torch.cat(self.val_embeddings, dim=0).numpy()
+        all_labels = torch.cat(self.val_labels, dim=0).numpy()
+
+        # Check that at least two classes are there
+        if len(np.unique(all_labels)) < 2:
+            self.log("val_f1", 0.0, prog_bar=True)
+            return
+
+        # Clear the lists for the next epoch
+        self.val_embeddings.clear()
+        self.val_labels.clear()
+
+        # Define the classifier
+        clf = LogisticRegression(max_iter=1000)
+
+        # Use Stratified K-Fold to maintain label distribution across folds
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+        # Compute cross-validated F1 scores
+        f1_scores = cross_val_score(
+            clf, all_embeddings, all_labels, cv=skf, scoring="f1_macro"
         )
 
-        # Logging
-        self.log(
-            "val_barlow_loss",
-            loss,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-            batch_size=self.batch_size,
-        )
+        # Calculate the mean F1 score
+        mean_f1 = np.mean(f1_scores)
 
-        return loss
+        self.log("val_f1", mean_f1, prog_bar=True)
 
     def training_step(self, batch, batch_idx):
         xt1, xt2, _, _, _ = batch
@@ -190,8 +201,6 @@ class ResNetBarlow(LightningModule):
 
         # Logging
         self.log("barlow_loss", barlow_loss, on_step=True, batch_size=self.batch_size)
-
-        return barlow_loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
@@ -277,7 +286,6 @@ if __name__ == "__main__":
         ds_train,
         resize_func=resize_func,
         normalization_transform=remove_background,
-        delete_cache=False,
         augm_before_resize=augm_before_resize,
         augm_after_resize=augm_after_resize,
     )
@@ -285,9 +293,6 @@ if __name__ == "__main__":
         ds_valid,
         resize_func=resize_func,
         normalization_transform=remove_background,
-        delete_cache=False,
-        augm_before_resize=augm_before_resize,
-        augm_after_resize=augm_after_resize,
     )
 
     # Dataloader
@@ -309,22 +314,25 @@ if __name__ == "__main__":
         persistent_workers=True,
     )
 
-    # Checkpoint to save the best model based on the lowest validation loss
-    checkpoint_callback_loss = ModelCheckpoint(
-        monitor="val_barlow_loss",
+    # Checkpoint to save the best model based on the lowest validation f1
+    checkpoint_callback_f1 = ModelCheckpoint(
+        monitor="val_f1",
         dirpath=wandb_logger.experiment.dir,
-        filename="val_barlow_loss-{epoch:02d}-{step:05d}-{val_f1:.3f}",
+        filename="val_f1-{epoch:02d}-{step:05d}-{val_f1:.3f}",
         save_top_k=1,
-        mode="min",
+        mode="max",
     )
 
     # Early stopping based on validation loss
     early_stopping_callback = EarlyStopping(
-        monitor="val_barlow_loss",
+        monitor="val_f1",
         patience=3,  # It's 3 Epochs.
         verbose=True,
-        mode="min",
+        mode="max",
     )
+
+    # Learning rate logger
+    lr_monitor = LearningRateMonitor(logging_interval="step")
 
     # Setup Model
     model = ResNetBarlow(
@@ -345,8 +353,7 @@ if __name__ == "__main__":
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
         enable_progress_bar=False,
-        check_val_every_n_epoch=1,
-        callbacks=[checkpoint_callback_loss, early_stopping_callback],
+        callbacks=[checkpoint_callback_f1, early_stopping_callback, lr_monitor],
     )
 
     # Train

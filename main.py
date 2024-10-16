@@ -12,15 +12,10 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision.transforms import Compose
 
 import wandb
-from ecallisto_dataset import (
-    CustomSpecAugment,
-    EcallistoDatasetBinary,
-    TimeWarpAugmenter,
-    custom_resize,
-    filter_antennas,
-    randomly_reduce_class_samples,
-    remove_background,
-)
+from ecallisto_dataset import (CustomSpecAugment, EcallistoDatasetBinary,
+                               TimeWarpAugmenter, custom_resize,
+                               filter_antennas, randomly_reduce_class_samples,
+                               remove_background)
 from ecallisto_model import ResNet
 
 if __name__ == "__main__":
