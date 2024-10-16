@@ -165,7 +165,7 @@ class EcallistoBarlowDataset(EcallistoDataset):
         normalization_transform=None,
         cache=True,
         delete_cache_after_run=True,
-        cache_base_dir="/tmp/vincenzo/ecallisto",
+        cache_base_dir="/tmp/vincenzo/CAN_BE_DELETED/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
     ):
@@ -196,7 +196,11 @@ class EcallistoBarlowDataset(EcallistoDataset):
             image = self.normalization_transform(image)
             if self.cache:
                 os.makedirs(os.path.dirname(example_image_path), exist_ok=True)
-                torch.save(image, example_image_path)
+                try:
+                    torch.save(image, example_image_path)
+                except Exception as e:
+                    print(f"Error saving image to cache: {e}")
+                    print(f"Image path: {example_image_path}")
         else:
             image = torch.load(example_image_path)
 

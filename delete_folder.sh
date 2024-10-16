@@ -8,4 +8,4 @@
 #SBATCH --error=logs/%j.err
 
 
-rm -rf /tmp/vincenzo/ecallisto
+rm -rf /tmp/vincenzo/
