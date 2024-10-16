@@ -302,13 +302,13 @@ if __name__ == "__main__":
         normalization_transform=remove_background,
         augm_before_resize=augm_before_resize,
         augm_after_resize=augm_after_resize,
-        delete_cache_after_run=False,
+        cache=False,
     )
     ds_valid = EcallistoBarlowDataset(
         ds_valid,
         resize_func=resize_func,
         normalization_transform=remove_background,
-        delete_cache_after_run=False,
+        cache=False,
     )
 
     # Dataloader

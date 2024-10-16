@@ -202,7 +202,15 @@ class EcallistoBarlowDataset(EcallistoDataset):
                     print(f"Error saving image to cache: {e}")
                     print(f"Image path: {example_image_path}")
         else:
-            image = torch.load(example_image_path)
+            try:
+                image = torch.load(example_image_path)
+            except Exception as e:
+                print(f"Error loading image from cache: {e}")
+                print(f"Image path: {example_image_path}")
+
+                # Load it normally
+                image = self.image_to_torch_tensor(example)
+                image = self.normalization_transform(image)
 
         image: torch.Tensor
 
