@@ -7,8 +7,7 @@ from torchvision.transforms import Compose
 from tqdm import tqdm
 
 import wandb
-from ecallisto_dataset import (EcallistoDatasetBinary, custom_resize,
-                               remove_background)
+from ecallisto_dataset import EcallistoDatasetBinary, custom_resize, remove_background
 from ecallisto_model import ResNet
 
 

@@ -3,16 +3,17 @@ import argparse
 import os
 
 import numpy as np
-# Modeling
-# Visualization
 import torch
 import torch.nn as nn
 import yaml
 from datasets import load_dataset
-from lightning.pytorch.callbacks import LearningRateMonitor
-from pytorch_lightning import LightningModule, Trainer
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
+from lightning.pytorch import LightningModule, Trainer
+from lightning.pytorch.callbacks import (
+    EarlyStopping,
+    LearningRateMonitor,
+    ModelCheckpoint,
+)
+from lightning.pytorch.loggers import WandbLogger
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from torch.utils.data import DataLoader
@@ -20,9 +21,13 @@ from torchvision import models
 from torchvision.transforms import Compose
 
 import wandb
-from ecallisto_dataset import (CustomSpecAugment, EcallistoBarlowDataset,
-                               TimeWarpAugmenter, custom_resize,
-                               remove_background)
+from ecallisto_dataset import (
+    CustomSpecAugment,
+    EcallistoBarlowDataset,
+    TimeWarpAugmenter,
+    custom_resize,
+    remove_background,
+)
 
 RESNET_DICT = {
     "resnet18": models.resnet18,
