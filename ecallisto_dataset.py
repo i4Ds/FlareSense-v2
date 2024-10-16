@@ -24,7 +24,7 @@ class EcallistoDataset(Dataset):
         normalization_transform=None,
         cache=True,
         delete_cache_after_run=True,
-        cache_base_dir="/tmp/vincenzo/ecallisto",
+        cache_base_dir="/tmp/vincenzo/CAN_BE_DELETED/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
     ):
@@ -45,9 +45,8 @@ class EcallistoDataset(Dataset):
 
             # Cleanup
             self.cache = cache
-            self.delete_cache_after_run = delete_cache_after_run
             self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
-            if self.delete_cache_after_run:
+            if delete_cache_after_run:
                 atexit.register(self.clean_up)
                 signal.signal(signal.SIGTERM, self.clean_up)
                 signal.signal(signal.SIGINT, self.clean_up)
@@ -132,7 +131,11 @@ class EcallistoDataset(Dataset):
             image = self.normalization_transform(image)
             if self.cache:
                 os.makedirs(os.path.dirname(example_image_path), exist_ok=True)
-                torch.save(image, example_image_path)
+                try:
+                    torch.save(image, example_image_path)
+                except Exception as e:
+                    print(f"Error saving image to cache: {e}")
+                    print(f"Image path: {example_image_path}")
         else:
             image = torch.load(example_image_path)
 

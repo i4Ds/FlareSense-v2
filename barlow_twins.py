@@ -16,6 +16,7 @@ from lightning.pytorch.callbacks import (
 from lightning.pytorch.loggers import WandbLogger
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.metrics import f1_score, make_scorer
 from torch.utils.data import DataLoader
 from torchvision import models
 from torchvision.transforms import Compose
@@ -166,12 +167,12 @@ class ResNetBarlow(LightningModule):
 
     def on_validation_epoch_end(self):
         all_embeddings = torch.cat(self.val_embeddings, dim=0).numpy()
-        all_labels = torch.cat(self.val_labels, dim=0).numpy()
+        all_labels = torch.cat(self.val_labels, dim=0).numpy().astype(int)
 
         # Check that at least two classes are there
         if len(np.unique(all_labels)) < 2:
-            self.log("val_f1", 0.0, prog_bar=True)
-            return
+            # Create 2 dummy classes
+            all_labels = np.random.choice([0, 1], size=len(all_labels))
 
         # Clear the lists for the next epoch
         self.val_embeddings.clear()
@@ -185,7 +186,11 @@ class ResNetBarlow(LightningModule):
 
         # Compute cross-validated F1 scores
         f1_scores = cross_val_score(
-            clf, all_embeddings, all_labels, cv=skf, scoring="f1_macro"
+            clf,
+            all_embeddings,
+            all_labels,
+            cv=skf,
+            scoring=make_scorer(f1_score, average="binary"),
         )
 
         # Calculate the mean F1 score
@@ -206,6 +211,9 @@ class ResNetBarlow(LightningModule):
 
         # Logging
         self.log("barlow_loss", barlow_loss, on_step=True, batch_size=self.batch_size)
+
+        # Return the loss
+        return barlow_loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
@@ -250,6 +258,7 @@ if __name__ == "__main__":
     # Setup wandb
     wandb.init(
         entity="vincenzo-timmel",
+        project="FlareSense-Barlow-Twins",
         config=config,
         settings=wandb.Settings(
             _stats_disk_paths=("/mnt/nas05/data01/vincenzo/", "/"),
@@ -293,11 +302,13 @@ if __name__ == "__main__":
         normalization_transform=remove_background,
         augm_before_resize=augm_before_resize,
         augm_after_resize=augm_after_resize,
+        delete_cache_after_run=False,
     )
     ds_valid = EcallistoBarlowDataset(
         ds_valid,
         resize_func=resize_func,
         normalization_transform=remove_background,
+        delete_cache_after_run=False,
     )
 
     # Dataloader
@@ -337,7 +348,7 @@ if __name__ == "__main__":
     )
 
     # Learning rate logger
-    lr_monitor = LearningRateMonitor(logging_interval="step")
+    lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     # Setup Model
     model = ResNetBarlow(

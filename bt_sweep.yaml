@@ -3,8 +3,8 @@ method: bayes
 project: FlareSense-Barlow-Twins
 entity: vincenzo-timmel
 metric:
-  name: val_barlow_loss
-  goal: minimize
+  name: val_f1
+  goal: maximize
 
 parameters:
   model:
