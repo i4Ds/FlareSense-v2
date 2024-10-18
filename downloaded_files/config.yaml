@@ -1,0 +1,104 @@
+wandb_version: 1
+
+general:
+  desc: null
+  value:
+    batch_size: 64
+    max_epochs: 3
+model:
+  desc: null
+  value:
+    model_type: resnet50
+    lambda_bt: 0.008442058241425963
+    projection_hidden_dim: 2048
+    projection_dim: 128
+    input_size:
+    - 224
+    - 224
+    optimizer_name: adam
+    lr: 0.000448576821957542
+    weight_decay: 1.5507093644085005e-05
+    warmup_lr: 4
+    hidden_dim: 2048
+data:
+  desc: null
+  value:
+    train_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
+    train_split: train
+    val_path: i4ds/radio-sunburst-ecallisto-paths-df-v2-TEST-SET-SPLIT
+    val_split: train
+    test_path: i4ds/radio-sunburst-ecallisto-paths-df-v2-TEST-SET-SPLIT
+    test_split: validation
+    frequency_masking_para: 36
+    time_masking_para: 10
+    freq_mask_method: random
+    time_warp_w: 796
+_wandb:
+  desc: null
+  value:
+    python_version: 3.12.2
+    cli_version: 0.16.3
+    framework: huggingface
+    huggingface_version: 4.38.2
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1729145097.197136
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      - 41
+      - 49
+      - 51
+      - 53
+      - 55
+      2:
+      - 1
+      - 5
+      - 11
+      - 41
+      - 49
+      - 51
+      - 53
+      - 55
+      3:
+      - 16
+      - 23
+      - 37
+      4: 3.12.2
+      5: 0.16.3
+      6: 4.38.2
+      8:
+      - 5
+      13: linux-x86_64
+resnet_type:
+  desc: null
+  value: resnet50
+batch_size:
+  desc: null
+  value: 64
+optimizer_name:
+  desc: null
+  value: adam
+learning_rate:
+  desc: null
+  value: 0.000448576821957542
+augmentation_func:
+  desc: null
+  value: augment_image
+warmup_lr:
+  desc: null
+  value: 4
+model_weights:
+  desc: null
+  value: null
+projection_dim:
+  desc: null
+  value: 128
+projection_hidden_dim:
+  desc: null
+  value: 2048
+lambda_bt:
+  desc: null
+  value: 0.008442058241425963

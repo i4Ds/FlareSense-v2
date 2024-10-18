@@ -172,6 +172,7 @@ class ResNetBarlow(LightningModule):
         # Check that at least two classes are there
         if len(np.unique(all_labels)) < 2:
             # Create 2 dummy classes
+            print("Only one class in the labels available :(")
             all_labels = np.random.choice([0, 1], size=len(all_labels))
 
         # Clear the lists for the next epoch
@@ -188,7 +189,7 @@ class ResNetBarlow(LightningModule):
         f1_scores = cross_val_score(
             clf,
             all_embeddings,
-            all_labels,
+            all_labels.ravel(),
             cv=skf,
             scoring=make_scorer(f1_score, average="binary"),
         )

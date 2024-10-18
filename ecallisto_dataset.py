@@ -244,6 +244,7 @@ class EcallistoDatasetBinary(EcallistoDataset):
         normalization_transform=None,
         augm_before_resize=None,
         augm_after_resize=None,
+        cache=True,
     ):
         # Initialize the parent class
         super().__init__(
@@ -252,6 +253,7 @@ class EcallistoDatasetBinary(EcallistoDataset):
             normalization_transform,
             augm_before_resize=augm_before_resize,
             augm_after_resize=augm_after_resize,
+            cache=False,
         )
 
     def __getitem__(self, index):
