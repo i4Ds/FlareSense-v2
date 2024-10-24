@@ -27,7 +27,7 @@ if __name__ == "__main__":
     print(f"PyTorch version {torch.__version__}")
     # Check if CUDA is available
     if torch.cuda.is_available():
-        device_id = os.environ["SLURM_JOB_GPUS"]
+        device_id = os.environ.get("SLURM_JOB_GPUS")
         device_name = torch.cuda.get_device_name(torch.cuda.current_device())
         print(
             f"GPU is available: {device_name} (Device ID: {device_id}). I have {os.cpu_count()} cores available."
