@@ -67,7 +67,6 @@ def process_row(row, save_dir="/mnt/nas05/data01/vincenzo/ecallisto/hu_dataset")
         "model_label": int(row["pred"] > 0),
         "start_datetime": pd.to_datetime(row["datetime"]),
         "antenna": row["antenna"],
-        "freq_axis": df_parquet.columns.values.astype(np.float64).round(2),
     }
 
     return example, df_parquet
