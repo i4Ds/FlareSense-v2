@@ -20,6 +20,7 @@ class EcallistoDataset(Dataset):
     def __init__(
         self,
         dataset=None,
+        label_name="label",
         resize_func=None,
         normalization_transform=None,
         cache=True,
@@ -34,6 +35,7 @@ class EcallistoDataset(Dataset):
             )
         super().__init__()
         self.data = dataset
+        self.label_name = label_name
         self.normalization_transform = normalization_transform
         self.augm_before_resize = augm_before_resize
         self.augm_after_resize = augm_after_resize
@@ -83,7 +85,7 @@ class EcallistoDataset(Dataset):
         )
 
     def get_dataset_labels(self):
-        return self.data["label"]
+        return self.data[self.label_name]
 
     def get_class_weights(self):
         return self.dataset_label_weight
@@ -146,21 +148,68 @@ class EcallistoDataset(Dataset):
         image = global_min_max_scale(image)
 
         # Create example
-        example["label"] = torch.tensor(example["label"])
+        example[self.label_name] = torch.tensor(example[self.label_name])
         example["image"] = image
 
         return (
             example["image"].unsqueeze(0),
-            example["label"].unsqueeze(0),
+            example[self.label_name].unsqueeze(0),
             example["antenna"],
             example["datetime"],
         )
+
+
+class EcallistoDatasetBinary(EcallistoDataset):
+    def __init__(
+        self,
+        dataset=None,
+        label_name="label",
+        resize_func=None,
+        normalization_transform=None,
+        augm_before_resize=None,
+        augm_after_resize=None,
+        cache=True,
+    ):
+        # Initialize the parent class
+        super().__init__(
+            dataset,
+            label_name,
+            resize_func,
+            normalization_transform,
+            augm_before_resize=augm_before_resize,
+            augm_after_resize=augm_after_resize,
+            cache=cache,
+        )
+
+    def __getitem__(self, index):
+        """Function to return samples corresponding to a given index from a dataset"""
+        image, label, antenna, datetime = super().__getitem__(index)
+
+        label = label.squeeze(0)
+
+        # Convert label to binary
+        label = 0 if label.item() == 0 else 1
+
+        return image, torch.tensor(label).float().unsqueeze(0), antenna, datetime
+
+    def get_labels(self):
+        # Return binary labels: 0 if the label is 0, 1 otherwise
+        return np.where(np.array(self.data[self.label_name]) == 0, 0, 1)
+
+    def get_class_weights(self):
+        labels = self.get_labels()
+        cw = compute_class_weight(
+            class_weight="balanced", classes=np.unique(labels), y=labels
+        )
+        print(f"{cw.shape=}. {cw=}")
+        return cw[1]  # Binary
 
 
 class EcallistoBarlowDataset(EcallistoDataset):
     def __init__(
         self,
         dataset=None,
+        label_name="label",
         resize_func=None,
         normalization_transform=None,
         cache=True,
@@ -172,6 +221,7 @@ class EcallistoBarlowDataset(EcallistoDataset):
         # Call the parent class constructor
         super().__init__(
             dataset=dataset,
+            label_name=label_name,
             resize_func=resize_func,
             normalization_transform=normalization_transform,
             cache=cache,
@@ -223,61 +273,17 @@ class EcallistoBarlowDataset(EcallistoDataset):
         image_aug2 = global_min_max_scale(image_aug2)
 
         # Prepare the output example
-        example["label"] = torch.tensor(example["label"])
+        example[self.label_name] = torch.tensor(example[self.label_name])
         example["image1"] = image_aug1
         example["image2"] = image_aug2
 
         return (
             example["image1"].unsqueeze(0),
             example["image2"].unsqueeze(0),
-            example["label"].unsqueeze(0),
+            example[self.label_name].unsqueeze(0),
             example["antenna"],
             example["datetime"],
         )
-
-
-class EcallistoDatasetBinary(EcallistoDataset):
-    def __init__(
-        self,
-        dataset=None,
-        resize_func=None,
-        normalization_transform=None,
-        augm_before_resize=None,
-        augm_after_resize=None,
-        cache=True,
-    ):
-        # Initialize the parent class
-        super().__init__(
-            dataset,
-            resize_func,
-            normalization_transform,
-            augm_before_resize=augm_before_resize,
-            augm_after_resize=augm_after_resize,
-            cache=False,
-        )
-
-    def __getitem__(self, index):
-        """Function to return samples corresponding to a given index from a dataset"""
-        image, label, antenna, datetime = super().__getitem__(index)
-
-        label = label.squeeze(0)
-
-        # Convert label to binary
-        label = 0 if label.item() == 0 else 1
-
-        return image, torch.tensor(label).float().unsqueeze(0), antenna, datetime
-
-    def get_labels(self):
-        # Return binary labels: 0 if the label is 0, 1 otherwise
-        return np.where(np.array(self.data["label"]) == 0, 0, 1)
-
-    def get_class_weights(self):
-        labels = self.get_labels()
-        cw = compute_class_weight(
-            class_weight="balanced", classes=np.unique(labels), y=labels
-        )
-        print(f"{cw.shape=}. {cw=}")
-        return cw[1]  # Binary
 
 
 class CustomSpecAugment:

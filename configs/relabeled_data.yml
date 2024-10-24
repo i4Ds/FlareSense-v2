@@ -10,14 +10,14 @@ model:
   input_size: [224, 224]
   optimizer_name: adam
   lr: 0.0021418348849082266
-  label_smoothing: 0.0
+  label_smoothing: 0.1
 
 data:
-  train_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
+  train_path: i4ds/ecallisto_radio_sunburst
   train_split: train
-  val_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
+  val_path: i4ds/ecallisto_radio_sunburst
   val_split: validation
-  test_path: i4ds/radio-sunburst-ecallisto-paths-df-v2
+  test_path: i4ds/ecallisto_radio_sunburst
   test_split: test
   antennas_train: []
   antennas_val: []
