@@ -8,10 +8,10 @@ from tqdm import tqdm
 
 import wandb
 from ecallisto_dataset import EcallistoDatasetBinary, custom_resize, remove_background
-from ecallisto_model import ResNet
+from ecallisto_model import GrayScaleResNet
 
 
-def create_logits(model: ResNet, dataloader, device):
+def create_logits(model: GrayScaleResNet, dataloader, device):
     model.eval()  # Ensure the model is in evaluation mode
     model.to(device)  # Send the model to the appropriate device
     binay_logits = []
@@ -29,7 +29,7 @@ def load_model(checkpoint_path, config_path, device):
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
     # Initialize the model
-    model = ResNet(
+    model = GrayScaleResNet(
         1,
         resnet_type=config["model"]["model_type"],
         optimizer_name="adam",

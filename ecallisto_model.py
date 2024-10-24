@@ -236,7 +236,7 @@ class EcallistoBase(LightningModule):
         )
 
 
-class ResNet(EcallistoBase):
+class GrayScaleResNet(EcallistoBase):
     def __init__(
         self,
         n_classes,
@@ -262,8 +262,7 @@ class ResNet(EcallistoBase):
             weights=model_weights, num_classes=n_classes
         )
 
-    def forward(self, x):
-        # ResNet-18 expects 3-channel input, so ensure the input x is 3-channel
-        if x.size(1) == 1:
-            x = x.repeat(1, 3, 1, 1)
-        return self.resnet(x)
+        # Update first conv to deal with grayscale images
+        self.resnet.conv1 = torch.nn.Conv2d(
+            1, self.resnet.inplanes, kernel_size=7, stride=2, padding=3, bias=False
+        )

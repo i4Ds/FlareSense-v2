@@ -21,13 +21,13 @@ from ecallisto_dataset import (
     randomly_reduce_class_samples,
     remove_background,
 )
-from ecallisto_model import ResNet
+from ecallisto_model import GrayScaleResNet
 
 if __name__ == "__main__":
     print(f"PyTorch version {torch.__version__}")
     # Check if CUDA is available
     if torch.cuda.is_available():
-        device_id = os.environ["SLURM_JOB_GPUS"]
+        device_id = os.environ.get("SLURM_JOB_GPUS")
         device_name = torch.cuda.get_device_name(torch.cuda.current_device())
         print(
             f"GPU is available: {device_name} (Device ID: {device_id}). I have {os.cpu_count()} cores available."
@@ -168,7 +168,7 @@ if __name__ == "__main__":
 
     # Setup Model
     cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
-    model = ResNet(
+    model = GrayScaleResNet(
         n_classes=1,  # Binary
         resnet_type=config["model"]["model_type"],
         class_weights=(cw if config["general"]["use_class_weights"] else None),
