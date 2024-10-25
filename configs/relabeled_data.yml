@@ -1,5 +1,5 @@
 general:
-  batch_size: 32
+  batch_size: 64
   max_epochs: 20
   binary: True
   use_random_sampler: False
@@ -11,14 +11,16 @@ model:
   optimizer_name: adam
   lr: 0.0021418348849082266
   label_smoothing: 0.1
+  weight_decay: 0.0
 
 data:
   train_path: i4ds/ecallisto_radio_sunburst
   train_split: train
   val_path: i4ds/ecallisto_radio_sunburst
-  val_split: validation
+  val_split: val
   test_path: i4ds/ecallisto_radio_sunburst
   test_split: test
+  label_name: model_label
   antennas_train: []
   antennas_val: []
   antennas_test: []

@@ -1,10 +1,11 @@
 # %%
-import pandas as pd
-import numpy as np
-import pyarrow.parquet as pq
-from PIL import Image
 import io
 import os
+
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq
+from PIL import Image
 from tqdm import tqdm
 
 # %%
@@ -28,8 +29,9 @@ sigmoid(0.4)
 
 # %%
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from PIL import Image
 
 
@@ -96,9 +98,10 @@ for index, row in tqdm(df_val.iterrows(), total=len(df_val)):
         examples_val.append(example)
 
 
+import datasets
+
 # %%
 from datasets import Dataset, DatasetDict
-import datasets
 
 dd = DatasetDict()
 dd["test"] = Dataset.from_pandas(pd.DataFrame(examples_test)).cast_column(

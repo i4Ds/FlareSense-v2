@@ -71,10 +71,12 @@ if __name__ == "__main__":
 
     # Create dataset
     ds_train = load_dataset(
-        config["data"]["train_path"], split=config["data"]["train_split"]
+        config["data"]["train_path"],
+        split=config["data"]["train_split"],
     )
     ds_valid = load_dataset(
-        config["data"]["train_path"], split=config["data"]["val_split"]
+        config["data"]["val_path"],
+        split=config["data"]["val_split"],
     )
 
     if config["data"]["reduce_non_burst"]:
@@ -110,6 +112,7 @@ if __name__ == "__main__":
     # Data Loader
     ds_train = EcallistoDatasetBinary(
         ds_train,
+        label_name=config["data"]["label_name"],
         resize_func=resize_func,
         normalization_transform=remove_background,
         augm_before_resize=augm_before_resize,
@@ -117,6 +120,7 @@ if __name__ == "__main__":
     )
     ds_valid = EcallistoDatasetBinary(
         ds_valid,
+        label_name=config["data"]["label_name"],
         resize_func=resize_func,
         normalization_transform=remove_background,
     )
@@ -175,6 +179,7 @@ if __name__ == "__main__":
         batch_size=config["general"]["batch_size"],
         optimizer_name=config["model"]["optimizer_name"],
         learning_rate=config["model"]["lr"],
+        weight_decay=config["model"]["weight_decay"],
         label_smoothing=config["model"]["label_smoothing"],
     )
 
@@ -183,7 +188,7 @@ if __name__ == "__main__":
         accelerator="gpu",
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
-        enable_progress_bar=False,
+        enable_progress_bar=True,
         val_check_interval=1.0,  # Every Epoch.
         callbacks=[checkpoint_callback_f1, early_stopping_callback],
     )
@@ -205,6 +210,7 @@ if __name__ == "__main__":
 
     ds_test = EcallistoDatasetBinary(
         ds_test,
+        label_name=config["data"]["label_name"],
         resize_func=resize_func,
         normalization_transform=remove_background,
     )

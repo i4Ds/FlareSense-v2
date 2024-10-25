@@ -15,8 +15,8 @@ from lightning.pytorch.callbacks import (
 )
 from lightning.pytorch.loggers import WandbLogger
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.metrics import f1_score, make_scorer
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 from torch.utils.data import DataLoader
 from torchvision import models
 from torchvision.transforms import Compose

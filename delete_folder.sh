@@ -3,7 +3,7 @@
 #SBATCH --job-name clean_tmp-v2
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:0
-#SBATCH --partition=p4500
+#SBATCH --partition=top6
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 

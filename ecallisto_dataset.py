@@ -2,6 +2,7 @@ import atexit
 import os
 import shutil
 import signal
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
@@ -9,9 +10,10 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
+from PIL import Image
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import Dataset
-from torchvision.transforms import Resize
+from torchvision.transforms import Resize, ToPILImage, ToTensor
 from torchvision.transforms.functional import pil_to_tensor
 
 
@@ -23,8 +25,8 @@ class EcallistoDataset(Dataset):
         label_name="label",
         resize_func=None,
         normalization_transform=None,
-        cache=True,
-        delete_cache_after_run=True,
+        cache=False,
+        delete_cache_after_run=False,
         cache_base_dir="/tmp/vincenzo/CAN_BE_DELETED/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
@@ -53,15 +55,23 @@ class EcallistoDataset(Dataset):
                 signal.signal(signal.SIGTERM, self.clean_up)
                 signal.signal(signal.SIGINT, self.clean_up)
 
-    @staticmethod
-    def image_to_torch_tensor(example):
+        # Setup some torch functions
+        self.to_tensor = ToTensor()
+
+    def image_to_torch_tensor(self, example):
         # Convert the example to a torch tensor
         if "file_path" in example:
             # It's a parquet file, containing a DF
             df = pd.read_parquet(example["file_path"])
             image = torch.from_numpy(df.values.T).float()
+        elif "bytes" in example["image"]:
+            image = Image.open(BytesIO(example["image"]["bytes"]))
+            image = self.to_tensor(image)
         else:
             image = pil_to_tensor(example["image"]).float()
+        # Check if batched dim 0 exists
+        if len(image.shape) == 3:
+            image = image.squeeze(0)
         return image
 
     def __len__(self):
@@ -122,6 +132,11 @@ class EcallistoDataset(Dataset):
         """Function to return samples corresponding to a given index from a dataset"""
         example = self.data[index]
 
+        # Make some fixes about columns
+        if not "datetime" in example:
+            example["datetime"] = example["start_datetime"]
+            del example["start_datetime"]
+
         # Type casting
         if not isinstance(example["datetime"], str):
             example["datetime"] = str(example["datetime"])
@@ -168,7 +183,7 @@ class EcallistoDatasetBinary(EcallistoDataset):
         normalization_transform=None,
         augm_before_resize=None,
         augm_after_resize=None,
-        cache=True,
+        cache=False,
     ):
         # Initialize the parent class
         super().__init__(
@@ -212,8 +227,8 @@ class EcallistoBarlowDataset(EcallistoDataset):
         label_name="label",
         resize_func=None,
         normalization_transform=None,
-        cache=True,
-        delete_cache_after_run=True,
+        cache=False,
+        delete_cache_after_run=False,
         cache_base_dir="/tmp/vincenzo/CAN_BE_DELETED/ecallisto",
         augm_before_resize=None,
         augm_after_resize=None,
@@ -236,8 +251,8 @@ class EcallistoBarlowDataset(EcallistoDataset):
         example = self.data[index]
 
         # Type casting
-        if not isinstance(example["datetime"], str):
-            example["datetime"] = str(example["datetime"])
+        if not isinstance(example["start_datetime"], str):
+            example["start_datetime"] = str(example["start_datetime"])
 
         # Caching
         example_image_path = self.create_cache_path(example)

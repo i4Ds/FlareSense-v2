@@ -85,6 +85,7 @@ class EcallistoBase(LightningModule):
         )
         return loss
 
+    @staticmethod
     def apply_label_smoothing(targets, smoothing):
         """
         Apply label smoothing to binary targets.
@@ -105,7 +106,7 @@ class EcallistoBase(LightningModule):
     def _loss(self, y_hat, y):
         # Apply label smoothing if needed
         if self.label_smoothing > 0:
-            y = self.apply_label_smoothing(y)
+            y = self.apply_label_smoothing(y, self.label_smoothing)
         if self.class_weights is not None:
             loss = self.loss_function(y_hat, y, weight=self.class_weights.to(y.device))
         else:
@@ -262,7 +263,8 @@ class GrayScaleResNet(EcallistoBase):
             weights=model_weights, num_classes=n_classes
         )
 
-        # Update first conv to deal with grayscale images
-        self.resnet.conv1 = torch.nn.Conv2d(
-            1, self.resnet.inplanes, kernel_size=7, stride=2, padding=3, bias=False
-        )
+    def forward(self, x):
+        # Convert the input grayscale image to 3 channels
+        if x.size(1) == 1:
+            x = x.repeat(1, 3, 1, 1)
+        return self.resnet(x)
