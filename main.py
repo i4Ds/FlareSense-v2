@@ -188,7 +188,7 @@ if __name__ == "__main__":
         accelerator="gpu",
         max_epochs=config["general"]["max_epochs"],
         logger=wandb_logger,
-        enable_progress_bar=True,
+        enable_progress_bar=False,
         val_check_interval=1.0,  # Every Epoch.
         callbacks=[checkpoint_callback_f1, early_stopping_callback],
     )
