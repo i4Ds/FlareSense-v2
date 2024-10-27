@@ -15,6 +15,11 @@ parameters:
       label_smoothing:
         max: 0.4
         min: 0.0
+      model_type:
+        values: [resnet18, resnet34, resnet50]
+      weight_decay:
+        max: 1.0e-2
+        min: 1.0e-6
   data:
     parameters:
       freq_mask_method:
@@ -35,4 +40,4 @@ command:
   - ${interpreter}
   - ${program}
   - "--config"
-  - "configs/relabel_test_only.yml" #Insert your model here (do not push it, adapt it each time.)
+  - "configs/relabeled_data.yml" #Insert your model here (do not push it, adapt it each time.)

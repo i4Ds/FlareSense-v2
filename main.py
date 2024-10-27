@@ -112,7 +112,7 @@ if __name__ == "__main__":
     # Data Loader
     ds_train = EcallistoDatasetBinary(
         ds_train,
-        label_name=config["data"]["label_name"],
+        label_name=config["data"]["train_label_name"],
         resize_func=resize_func,
         normalization_transform=remove_background,
         augm_before_resize=augm_before_resize,
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     )
     ds_valid = EcallistoDatasetBinary(
         ds_valid,
-        label_name=config["data"]["label_name"],
+        label_name=config["data"]["val_label_name"],
         resize_func=resize_func,
         normalization_transform=remove_background,
     )
@@ -210,7 +210,7 @@ if __name__ == "__main__":
 
     ds_test = EcallistoDatasetBinary(
         ds_test,
-        label_name=config["data"]["label_name"],
+        label_name=config["data"]["test_label_name"],
         resize_func=resize_func,
         normalization_transform=remove_background,
     )

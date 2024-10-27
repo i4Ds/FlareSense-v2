@@ -372,8 +372,9 @@ class TimeWarpAugmenter:
         if self.W == 0:
             return specs
         if specs.size(-1) <= 2 * self.W:
+            self.W = specs.size(-1) // 2  # Adjust W if it's too large for the input
             print(
-                f"Spec is too short to do time warping. Got: {specs.size(-1)}. Expected (min.): {2 * self.W + 1}"
+                f"Spec is too short to do time warping. Got: {specs.size(-1)}. Expected (min.): {2 * self.W + 1}\nAjusting W to {self.W}"
             )
             return specs
         if not torch.is_tensor(specs):
