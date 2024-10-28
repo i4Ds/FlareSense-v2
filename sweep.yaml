@@ -13,13 +13,13 @@ parameters:
         max: 1.0e-2
         min: 1.0e-6
       label_smoothing:
-        max: 0.4
+        max: 0.3
         min: 0.0
       model_type:
         values: [resnet18, resnet34, resnet50]
       weight_decay:
         max: 1.0e-2
-        min: 1.0e-6
+        min: 0
   data:
     parameters:
       freq_mask_method:
@@ -31,7 +31,7 @@ parameters:
         max: 80
         min: 0
       time_warp_w:
-        max: 1500
+        max: 800
         min: 0
 
 
