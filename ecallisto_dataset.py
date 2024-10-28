@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from PIL import Image
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import Dataset
-from torchvision.transforms import Resize, ToPILImage, ToTensor
+from torchvision.transforms import Resize, ToTensor
 from torchvision.transforms.functional import pil_to_tensor
 
 
@@ -42,14 +42,15 @@ class EcallistoDataset(Dataset):
         self.augm_before_resize = augm_before_resize
         self.augm_after_resize = augm_after_resize
         self.resize_func = resize_func
+        # Cleanup parameters.
+        self.cache = cache
+        self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
 
         # Process, if dataset is availble
         if self.data is not None:
             self.dataset_label_weight = self.get_dataset_label_weight()
 
-            # Cleanup
-            self.cache = cache
-            self.cache_dir = os.path.join(cache_base_dir, str(uuid4()))
+            
             if delete_cache_after_run:
                 atexit.register(self.clean_up)
                 signal.signal(signal.SIGTERM, self.clean_up)

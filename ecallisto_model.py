@@ -8,7 +8,6 @@ from pytorch_lightning import LightningModule
 from torchmetrics import ConfusionMatrix
 from torchmetrics.classification import F1Score, Precision, Recall
 from torchvision import models
-
 import wandb
 
 RESNET_DICT = {
@@ -266,5 +265,12 @@ class GrayScaleResNet(EcallistoBase):
     def forward(self, x):
         # Convert the input grayscale image to 3 channels
         if x.size(1) == 1:
-            x = x.repeat(1, 3, 1, 1)
+            x = x.expand(-1, 3, -1, -1)
         return self.resnet(x)
+
+
+if __name__ == '__main__':
+    x = torch.load('img.torch')
+    print(x.shape)
+    model = GrayScaleResNet(2, 'resnet18', 'adam', 1)
+    print(model(x.unsqueeze(0)))
