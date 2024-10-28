@@ -50,7 +50,6 @@ class EcallistoDataset(Dataset):
         if self.data is not None:
             self.dataset_label_weight = self.get_dataset_label_weight()
 
-            
             if delete_cache_after_run:
                 atexit.register(self.clean_up)
                 signal.signal(signal.SIGTERM, self.clean_up)
@@ -204,7 +203,7 @@ class EcallistoDatasetBinary(EcallistoDataset):
         label = label.squeeze(0)
 
         # Convert label to binary
-        label = 0 if label.item() == 0 else 1
+        label = 0 if label.detach() == 0 else 1
 
         return image, torch.tensor(label).float().unsqueeze(0), antenna, datetime
 
@@ -326,15 +325,15 @@ class CustomSpecAugment:
 
     def get_padding_value(self, spectrogram, method):
         if method == "max":
-            padding_value = torch.max(spectrogram).item()
+            padding_value = torch.max(spectrogram).detach()
         elif method == "min":
-            padding_value = torch.min(spectrogram).item()
+            padding_value = torch.min(spectrogram).detach()
         elif method == "median":
-            padding_value = torch.median(spectrogram).item()
+            padding_value = torch.median(spectrogram).detach()
         elif method == "mean":
-            padding_value = torch.mean(spectrogram).item()
+            padding_value = torch.mean(spectrogram).detach()
         elif method == "random":
-            padding_value = torch.rand(1).item()
+            padding_value = torch.rand(1).detach()
         else:
             raise ValueError(
                 "Invalid method parameter. Choose from 'max', 'min', 'median', 'mean', or 'random'."
@@ -343,15 +342,15 @@ class CustomSpecAugment:
 
     def frequency_mask(self, spectrogram, padding_values):
         num_mel_channels = spectrogram.size(0)
-        mask_param = torch.randint(0, self.frequency_masking_para + 1, (1,)).item()
-        f = torch.randint(0, num_mel_channels - mask_param + 1, (1,)).item()
+        mask_param = torch.randint(0, self.frequency_masking_para + 1, (1,)).detach()
+        f = torch.randint(0, num_mel_channels - mask_param + 1, (1,)).detach()
         spectrogram[f : f + mask_param, :] = padding_values
         return spectrogram
 
     def time_mask(self, spectrogram, padding_values):
         time_steps = spectrogram.size(1)
-        mask_param = torch.randint(0, self.time_masking_para + 1, (1,)).item()
-        t = torch.randint(0, time_steps - mask_param + 1, (1,)).item()
+        mask_param = torch.randint(0, self.time_masking_para + 1, (1,)).detach()
+        t = torch.randint(0, time_steps - mask_param + 1, (1,)).detach()
         spectrogram[:, t : t + mask_param] = padding_values
         return spectrogram
 

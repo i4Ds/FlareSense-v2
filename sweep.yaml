@@ -18,7 +18,7 @@ parameters:
       model_type:
         values: [resnet18, resnet34, resnet50]
       weight_decay:
-        max: 1.0e-2
+        max: 1.0E-6
         min: 0
   data:
     parameters:
@@ -31,7 +31,7 @@ parameters:
         max: 80
         min: 0
       time_warp_w:
-        max: 800
+        max: 1400
         min: 0
 
 

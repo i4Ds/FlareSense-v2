@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --time=24:00:00
+#SBATCH --time=20:00:00
 #SBATCH --job-name sweep_bt_flaresense
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=32G
@@ -8,4 +8,5 @@
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 
-wandb agent vincenzo-timmel/FlareSense-v2/l2z9yir9
+export HF_HOME=/tmp/vincenzo/huggingface
+wandb agent vincenzo-timmel/FlareSense-v2/yphfhn6d

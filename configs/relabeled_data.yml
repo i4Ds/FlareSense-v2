@@ -11,7 +11,7 @@ model:
   optimizer_name: adam
   lr: 0.0021418348849082266
   label_smoothing: 0.1
-  weight_decay: 0.0
+  weight_decay: 1.E-8
 
 data:
   train_path: i4ds/ecallisto_radio_sunburst

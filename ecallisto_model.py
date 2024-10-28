@@ -51,7 +51,7 @@ class EcallistoBase(LightningModule):
                 num_classes=n_classes, task="multiclass", average="macro"
             )
             self.confmat = ConfusionMatrix(num_classes=n_classes, task="multiclass")
-        self.class_weights = class_weights
+        self.class_weights = class_weights.to("cuda")
         self.label_smoothing = label_smoothing
         """
         self.loss_function = (
@@ -66,9 +66,6 @@ class EcallistoBase(LightningModule):
         self.optimizer_name = optimizer_name
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
-
-        # List to save test results
-        self.x_test = []
 
     def training_step(self, batch, batch_idx):
         x, y, _, _ = batch
@@ -97,7 +94,7 @@ class EcallistoBase(LightningModule):
             torch.Tensor: Smoothed targets.
         """
         # Ensure targets are floats
-        targets = targets.float().to(targets.device)
+        targets = targets.float()
         # Apply label smoothing
         smoothed_targets = targets * (1.0 - smoothing) + (1.0 - targets) * smoothing
         return smoothed_targets
@@ -107,7 +104,7 @@ class EcallistoBase(LightningModule):
         if self.label_smoothing > 0:
             y = self.apply_label_smoothing(y, self.label_smoothing)
         if self.class_weights is not None:
-            loss = self.loss_function(y_hat, y, weight=self.class_weights.to(y.device))
+            loss = self.loss_function(y_hat, y, weight=self.class_weights)
         else:
             loss = self.loss_function(y_hat, y)
         return loss
@@ -261,6 +258,8 @@ class GrayScaleResNet(EcallistoBase):
         self.resnet = RESNET_DICT[resnet_type](
             weights=model_weights, num_classes=n_classes
         )
+        # Compile
+        self.resnet = torch.compile(self.resnet)
 
     def forward(self, x):
         # Convert the input grayscale image to 3 channels
@@ -269,8 +268,8 @@ class GrayScaleResNet(EcallistoBase):
         return self.resnet(x)
 
 
-if __name__ == '__main__':
-    x = torch.load('img.torch')
+if __name__ == "__main__":
+    x = torch.load("img.torch")
     print(x.shape)
-    model = GrayScaleResNet(2, 'resnet18', 'adam', 1)
+    model = GrayScaleResNet(2, "resnet18", "adam", 1)
     print(model(x.unsqueeze(0)))
