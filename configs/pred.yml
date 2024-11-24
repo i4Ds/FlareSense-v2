@@ -1,0 +1,36 @@
+general:
+  batch_size: 64
+  max_epochs: 20
+  binary: True
+  use_random_sampler: False
+  use_class_weights: True
+
+model:
+  model_type: resnet34
+  input_size: [224, 224]
+  optimizer_name: adam
+  lr: 0.0023439
+  label_smoothing: 0.12465
+  weight_decay: 8.9648e-7
+
+data:
+  train_path: i4ds/ecallisto_radio_sunburst-mai-october
+  train_split: train
+  val_path: i4ds/ecallisto_radio_sunburst-mai-october
+  val_split: val
+  test_path: i4ds/ecallisto_radio_sunburst-mai-october
+  test_split: test
+  train_label_name: label
+  val_label_name: label
+  test_label_name: label
+  antennas_train: []
+  antennas_val: []
+  antennas_test: []
+  reduce_non_burst: False
+  train_class_to_reduce: 0
+  reduction_fraction: 0.2
+  use_augmentation: True
+  frequency_masking_para: 77
+  time_masking_para: 33
+  freq_mask_method: min
+  time_warp_w: 613

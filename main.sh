@@ -9,4 +9,4 @@
 #SBATCH --error=logs/%j.err
 
 export HF_HOME=/tmp/vincenzo/huggingface
-srun python main.py --config configs/relabeled_data.yml
+srun python pred.py

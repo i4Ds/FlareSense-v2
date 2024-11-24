@@ -9,4 +9,4 @@
 #SBATCH --error=logs/%j.err
 
 export HF_HOME=/tmp/vincenzo/huggingface
-wandb agent vincenzo-timmel/FlareSense-v2/yphfhn6d
+wandb agent vincenzo-timmel/FlareSense-v2/0mz88b8u

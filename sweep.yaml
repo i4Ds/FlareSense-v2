@@ -7,23 +7,8 @@ metric:
   name: test_f1
   goal: maximize
 parameters:
-  model:
-    parameters:
-      lr:
-        max: 1.0e-2
-        min: 1.0e-6
-      label_smoothing:
-        max: 0.3
-        min: 0.0
-      model_type:
-        values: [resnet18, resnet34, resnet50]
-      weight_decay:
-        max: 1.0E-6
-        min: 0
   data:
     parameters:
-      freq_mask_method:
-        values: [mean, random, max, min]
       frequency_masking_para:
         max: 80
         min: 0
@@ -40,4 +25,4 @@ command:
   - ${interpreter}
   - ${program}
   - "--config"
-  - "configs/relabeled_data.yml" #Insert your model here (do not push it, adapt it each time.)
+  - "configs/relabeled_data_best.yml" #Insert your model here (do not push it, adapt it each time.)

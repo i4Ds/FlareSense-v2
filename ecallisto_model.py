@@ -51,7 +51,7 @@ class EcallistoBase(LightningModule):
                 num_classes=n_classes, task="multiclass", average="macro"
             )
             self.confmat = ConfusionMatrix(num_classes=n_classes, task="multiclass")
-        self.class_weights = class_weights.to("cuda")
+        self.class_weights = class_weights
         self.label_smoothing = label_smoothing
         """
         self.loss_function = (
@@ -104,7 +104,7 @@ class EcallistoBase(LightningModule):
         if self.label_smoothing > 0:
             y = self.apply_label_smoothing(y, self.label_smoothing)
         if self.class_weights is not None:
-            loss = self.loss_function(y_hat, y, weight=self.class_weights)
+            loss = self.loss_function(y_hat, y, weight=self.class_weights.to(y.device))
         else:
             loss = self.loss_function(y_hat, y)
         return loss
