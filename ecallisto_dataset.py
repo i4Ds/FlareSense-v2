@@ -15,6 +15,7 @@ from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import Dataset
 from torchvision.transforms import Resize, ToTensor
 from torchvision.transforms.functional import pil_to_tensor
+from PIL import Image
 
 
 # Dataset
@@ -64,6 +65,9 @@ class EcallistoDataset(Dataset):
             # It's a parquet file, containing a DF
             df = pd.read_parquet(example["file_path"])
             image = torch.from_numpy(df.values.T).float()
+        elif isinstance(example["image"], Image.Image):
+            # Handle the case where example["image"] is already a PIL Image
+            image = self.to_tensor(example["image"])
         elif "bytes" in example["image"]:
             image = Image.open(BytesIO(example["image"]["bytes"]))
             image = self.to_tensor(image)

@@ -120,7 +120,7 @@ def main(checkpoint_reference, config):
     df_test = pd.DataFrame(dd["test"])
 
     for df in [df_train, df_val, df_test]:
-        df["datetime"] = pd.to_datetime(df["datetime"], format="%Y-%m-%d_%H-%M-%S")
+        df["datetime"] = pd.to_datetime(df["datetime"], format="%Y-%m-%d %H:%M:%S")
 
     # Create ecallisto dataset and dataloader
     ds_train, ds_valid, ds_test = prepare_ecallisto_datasets(dd, config)

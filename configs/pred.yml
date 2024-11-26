@@ -17,7 +17,7 @@ data:
   train_path: i4ds/ecallisto_radio_sunburst-mai-october
   train_split: train
   val_path: i4ds/ecallisto_radio_sunburst-mai-october
-  val_split: val
+  val_split: validation
   test_path: i4ds/ecallisto_radio_sunburst-mai-october
   test_split: test
   train_label_name: label
