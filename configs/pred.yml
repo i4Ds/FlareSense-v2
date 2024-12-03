@@ -34,3 +34,5 @@ data:
   time_masking_para: 33
   freq_mask_method: min
   time_warp_w: 613
+  pred_path: i4ds/ecallisto_radio_sunburst-2014
+  pred_split: train
