@@ -178,6 +178,26 @@ class EcallistoDataset(Dataset):
         )
 
 
+class EcallistoDatasetLive(Dataset):
+    def __init__(
+        self,
+        dataset,
+        normalization_transform,
+    ):
+        self.dataset = dataset
+
+    def __getitem__(self, index):
+        """Function to return samples corresponding to a given index from a dataset"""
+        image = self.dataset[index]
+        tensor = pil_to_tensor(image).float()
+        tensor = tensor.squeeze(0)
+        tensor = global_min_max_scale(tensor)
+
+        label = label.squeeze(0)
+
+        return image
+
+
 class EcallistoDatasetBinary(EcallistoDataset):
     def __init__(
         self,

@@ -14,17 +14,18 @@ from ecallisto_model import GrayScaleResNet
 def create_logits(model: GrayScaleResNet, dataloader, device):
     model.eval()  # Ensure the model is in evaluation mode
     model.to(device)  # Send the model to the appropriate device
-    binay_logits = []
+    binary_logits = []
 
+    print("Starting prediction")
     with torch.no_grad():
         for inputs, _, _, _ in tqdm(dataloader):
             y_hat = model(inputs.to(device)).squeeze(dim=1)
-            binay_logits.extend(y_hat.cpu().tolist())
+            binary_logits.extend(y_hat.cpu().tolist())
 
-    return binay_logits
+    return binary_logits
 
 
-def load_model(checkpoint_path, config_path, device):
+def load_model(checkpoint_path, config_path):
     # Load configuration
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
@@ -38,23 +39,25 @@ def load_model(checkpoint_path, config_path, device):
     )
 
     # Load checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint["state_dict"])
 
     return model, config
 
 
-def prepare_ecallisto_datasets(dd, config):
+def prepare_ecallisto_datasets(ds, config):
     resize_func = Compose(
         [lambda x: custom_resize(x, tuple(config["model"]["input_size"]))]
     )
-
-    ds = EcallistoDatasetBinary(
-        dd["train"],
+    print("Wohoho")
+    ds = ds.add_column("dummy_label", [0] * len(ds))
+    edb = EcallistoDatasetBinary(
+        ds,
+        label_name="dummy_label",
         resize_func=resize_func,
         normalization_transform=remove_background,
     )
-    return ds
+    return edb
 
 
 def prepare_dataloaders(ds, batch_size):
@@ -74,24 +77,28 @@ def main(checkpoint_reference, config):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load model and configuration
-    model, config = load_model(artifact.file(), config, device)
+    print(artifact.file())
+    model, config = load_model(artifact.file(), config)
+
+    print("model loaded")
 
     # Prepare datasets and dataloaders
     ds = load_dataset(config["data"]["pred_path"], split=config["data"]["pred_split"])
 
     # Create ecallisto dataset and dataloader
-    ds = prepare_ecallisto_datasets(ds, config)
+    edb = prepare_ecallisto_datasets(ds, config)
+    print(edb)
 
-    dataloader = prepare_dataloaders(ds, config["general"]["batch_size"])
-
-    # Convert datetime columns to pd.datetime
-    df = pd.DataFrame(ds["train"])
-
-    df["datetime"] = pd.to_datetime(df["datetime"], format="%Y-%m-%d %H:%M:%S")
+    dataloader = prepare_dataloaders(edb, config["general"]["batch_size"])
 
     # Predict probabilities
-    df["pred"] = create_logits(model, dataloader, device)
-    ds.to_csv(f"{config['data']['pred_path'].split('/')[1]}_test.csv")
+    preds = create_logits(model, dataloader, device)
+
+    # Save a dataframe with the predictions
+    ds = ds.select_columns(["datetime", "antenna"])
+    df = ds.to_pandas()
+    df["pred"] = preds
+    df.to_csv(f"{config['data']['pred_path'].split('/')[1]}_test.csv")
 
 
 if __name__ == "__main__":
