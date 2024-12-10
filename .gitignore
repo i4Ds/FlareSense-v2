@@ -167,3 +167,4 @@ FlareSense-v2/**/*.ckpt
 **/metadata.csv
 original_labels/*
 *.csv
+flaresense-data/*
