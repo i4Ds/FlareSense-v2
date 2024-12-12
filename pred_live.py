@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     create_overlapping_parquets(
-        now - timedelta(hours=12),
+        now - timedelta(hours=2),
         now,
         [
             "Australia-ASSA_02",
@@ -131,8 +131,10 @@ if __name__ == "__main__":
             row["datetime"], row["datetime"] + timedelta(minutes=15), row["antenna"]
         )[row["antenna"]]
         fig = plot_spectrogram(subtract_constant_background(data).clip(0, 16))
-
-        path = f'burst_plots/{row["antenna"]}/{row["proba"]*100:.2f}_{row["antenna"]}_{row["datetime"].strftime("%d-%m-%Y_%H-%M-%S")}.png'
+        year = row["datetime"].year
+        month = f'{row["datetime"].month:02d}'
+        day = f'{row["datetime"].day:02d}'
+        path = f'burst_plots/years/{year}/{month}/{day}/{row["antenna"]}/{row["proba"]*100:.2f}_{row["antenna"]}_{row["datetime"].strftime("%d-%m-%Y_%H-%M-%S")}.png'
         os.makedirs(os.path.dirname(path), exist_ok=True)
         fig.write_image(path)
 
