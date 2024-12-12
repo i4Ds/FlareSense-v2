@@ -26,11 +26,10 @@ import shutil
 REPO_ID = "i4ds/flaresense"
 MODEL_FILENAME = "model.ckpt"
 CONFIG_PATH = "configs/relabeled_data_best.yml"
-T = 1.006 # Temperature parameter
+T = 1.006  # Temperature parameter
 torch.set_float32_matmul_precision("high")
 
 # Parameters
-from app import BASE_PATH
 INSTRUMENT_LIST = [
     "Australia-ASSA_02",
     "Australia-ASSA_62",
@@ -110,7 +109,10 @@ def prepare_dataloaders(ds: EcallistoDatasetBinary, batch_size: int):
         ds, batch_size=batch_size, shuffle=False, persistent_workers=False
     )
 
+
 if __name__ == "__main__":
+    from app import BASE_PATH
+
     checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -138,13 +140,17 @@ if __name__ == "__main__":
         ds = ds.add_column("pred", preds)
 
         # Filter bursts
-        ds_bursts = ds.filter(lambda x: x["pred"] > 0).select_columns(["datetime", "antenna", "pred", "path"])
+        ds_bursts = ds.filter(lambda x: x["pred"] > 0).select_columns(
+            ["datetime", "antenna", "pred", "path"]
+        )
         df_bursts = ds_bursts.to_pandas()
         df_bursts["proba"] = df_bursts["pred"].apply(lambda x: sigmoid(x))
 
         # Generate and save plots
         for i, row in df_bursts.iterrows():
-            data = get_ecallisto_data(row["datetime"], row["datetime"] + timedelta(minutes=15), row["antenna"])[row["antenna"]]
+            data = get_ecallisto_data(
+                row["datetime"], row["datetime"] + timedelta(minutes=15), row["antenna"]
+            )[row["antenna"]]
             fig = plot_spectrogram(subtract_constant_background(data).clip(0, 16))
             year = row["datetime"].year
             month = f'{row["datetime"].month:02d}'
