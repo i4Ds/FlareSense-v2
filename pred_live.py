@@ -19,14 +19,49 @@ from ecallisto_ng.plotting.plotting import plot_spectrogram
 from ecallisto_ng.data_processing.utils import subtract_constant_background
 from ecallisto_ng.data_download.downloader import get_ecallisto_data
 import numpy as np
+import tempfile
 import shutil
-import plotly.graph_objects as go
 
+# Model Parameters
+REPO_ID = "i4ds/flaresense"
+MODEL_FILENAME = "model.ckpt"
+CONFIG_PATH = "configs/relabeled_data_best.yml"
+T = 1.006 # Temperature parameter
 torch.set_float32_matmul_precision("high")
+
+# Parameters
+from app import BASE_PATH
+INSTRUMENT_LIST = [
+    "Australia-ASSA_02",
+    "Australia-ASSA_62",
+    "ALASKA-HAARP_62",
+    "AUSTRIA-UNIGRAZ_01",
+    "BIR_01",
+    "GERMANY-DLR_63",
+    "GERMANY-ESSEN_58",
+    "HUMAIN_59",
+    "ITALY-Strassolt_01",
+    "NORWAY-EGERSUND_01",
+    "TRIEST_57",
+]
+
+
+def sigmoid(x, T=T):
+    return 1 / (1 + np.exp(-x / T))
 
 
 def create_logits(model: GrayScaleResNet, dataloader: DataLoader, device: str):
-    """Generate logits for all samples in a DataLoader."""
+    """
+    Generate logits for all samples in a DataLoader.
+
+    Args:
+        model (GrayScaleResNet): The model used to generate logits.
+        dataloader (DataLoader): DataLoader providing batches of input data.
+        device (str): The device to perform computation on ('cpu' or 'cuda').
+
+    Returns:
+        list: A list of logits for all samples in the DataLoader.
+    """
     model.eval()
     model.to(device)
     binary_logits = []
@@ -75,68 +110,51 @@ def prepare_dataloaders(ds: EcallistoDatasetBinary, batch_size: int):
         ds, batch_size=batch_size, shuffle=False, persistent_workers=False
     )
 
-
-def cleanup_parquets(directory: str):
-    """Delete parquet files in a directory."""
-    files = glob.glob("*.parquet", root_dir=directory, recursive=True)
-    for f in files:
-        os.remove(f)
-
-
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-
 if __name__ == "__main__":
-    repo_id = "i4ds/flaresense"
-    filename = "model.ckpt"
-    config_path = "configs/relabeled_data_best.yml"
-    checkpoint_path = hf_hub_download(repo_id=repo_id, filename=filename)
+    checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    # Prepare time range
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    create_overlapping_parquets(
-        now - timedelta(hours=2),
-        now,
-        [
-            "Australia-ASSA_02",
-            "Australia-ASSA_62",
-            "ALASKA-HAARP_62",
-            "AUSTRIA-UNIGRAZ_01",
-            "BIR_01",
-            "GERMANY-DLR_63",
-            "GERMANY-ESSEN_58",
-            "HUMAIN_59",
-            "ITALY-Strassolt_01",
-            "NORWAY-EGERSUND_01",
-            "TRIEST_57"
-        ],
-        "flaresense-data",
-    )
+    start_time = now - timedelta(hours=2)
 
-    ds = load_radio_dataset("flaresense-data/")
-    model, config = load_model(checkpoint_path, config_path)
-    ds_e = prepare_ecallisto_datasets(ds, config)
-    data_loader = prepare_dataloaders(ds_e, 32)
-    preds = create_logits(model, data_loader, "cuda")
-    ds = ds.add_column("pred", preds)
-    ds_bursts = ds.filter(lambda x: x["pred"] > 0).select_columns(
-        ["datetime", "antenna", "pred", "path"]
-    )
-    df_bursts = ds_bursts.to_pandas()
-    df_bursts["proba"] = df_bursts["pred"].apply(lambda x: sigmoid(x))
+    # Temporary directory for parquet data
+    tmp_dir = tempfile.mkdtemp()
 
-    # Create plots
-    for i, row in df_bursts.iterrows():
-        data = get_ecallisto_data(
-            row["datetime"], row["datetime"] + timedelta(minutes=15), row["antenna"]
-        )[row["antenna"]]
-        fig = plot_spectrogram(subtract_constant_background(data).clip(0, 16))
-        year = row["datetime"].year
-        month = f'{row["datetime"].month:02d}'
-        day = f'{row["datetime"].day:02d}'
-        path = f'burst_plots/years/{year}/{month}/{day}/{row["antenna"]}/{row["proba"]*100:.2f}_{row["antenna"]}_{row["datetime"].strftime("%d-%m-%Y_%H-%M-%S")}.png'
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        fig.write_image(path)
+    try:
+        # Create parquet data from instruments
+        create_overlapping_parquets(start_time, now, INSTRUMENT_LIST, tmp_dir)
 
-    # Cleanup
-    shutil.rmtree("flaresense-data")
+        # Load dataset and model
+        ds = load_radio_dataset(tmp_dir)
+        model, config = load_model(checkpoint_path, CONFIG_PATH)
+
+        # Prepare dataset and dataloaders
+        ds_e = prepare_ecallisto_datasets(ds, config)
+        data_loader = prepare_dataloaders(ds_e, batch_size=32)
+
+        # Generate predictions
+        preds = create_logits(model, data_loader, device)
+        ds = ds.add_column("pred", preds)
+
+        # Filter bursts
+        ds_bursts = ds.filter(lambda x: x["pred"] > 0).select_columns(["datetime", "antenna", "pred", "path"])
+        df_bursts = ds_bursts.to_pandas()
+        df_bursts["proba"] = df_bursts["pred"].apply(lambda x: sigmoid(x))
+
+        # Generate and save plots
+        for i, row in df_bursts.iterrows():
+            data = get_ecallisto_data(row["datetime"], row["datetime"] + timedelta(minutes=15), row["antenna"])[row["antenna"]]
+            fig = plot_spectrogram(subtract_constant_background(data).clip(0, 16))
+            year = row["datetime"].year
+            month = f'{row["datetime"].month:02d}'
+            day = f'{row["datetime"].day:02d}'
+            out_dir = f'{BASE_PATH}/{year}/{month}/{day}/{row["antenna"]}'
+            out_name = f'{row["proba"]*100:.2f}_{row["antenna"]}_{row["datetime"].strftime("%d-%m-%Y_%H-%M-%S")}.png'
+            out_path = os.path.join(out_dir, out_name)
+
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            fig.write_image(out_path)
+
+    finally:
+        shutil.rmtree(tmp_dir)
