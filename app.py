@@ -1,6 +1,9 @@
 import gradio as gr
 import glob, os
 from datetime import datetime
+import os, glob
+import tempfile
+import pandas as pd
 
 BASE_PATH = os.path.join(os.getcwd(), "burst_plots")
 
@@ -40,9 +43,45 @@ def load_images(year, month, day, sort_by, min_proba):
 
     # Min proba
     img_data = [x for x in img_data if x[1] >= min_proba]
+    if len(img_data) == 0:
+        return ["style/DALLE_ERROR.png"]
 
-    return [(x[0], f"Confidence: {x[1]:.2f}") for x in img_data]
+    return [(x[0], f"Probability: {x[1]:.2f}") for x in img_data]
 
+
+def table_to_df(table_data):
+    df = pd.DataFrame(table_data, columns=["Antenna", "Date", "Probability"])
+    return df
+
+def download_csv(year, month, day, sort_by, min_proba):
+    # Return CSV for immediate download
+    _, table_data = load_images_and_table(year, month, day, sort_by, min_proba)
+    df = table_to_df(table_data)
+    tmp_dir = tempfile.mkdtemp()
+    csv_path = os.path.join(tmp_dir, f"FlareSense_BurstPlots_{year}_{month}_{day}.csv")
+    df.to_csv(csv_path, index=False)
+    return csv_path
+
+
+def load_images_and_table(year, month, day, sort_by, min_proba):
+    img_data = load_images(year, month, day, sort_by, min_proba)  # from your code
+    # Reload or reuse logic to produce table_data
+    # Example: for each image path, parse antenna, dt, proba
+    # Return both gallery data and table
+    table_data = []
+    search_path = os.path.join(BASE_PATH, year, month, day, "*", "*")
+    for f in glob.glob(search_path):
+        base = os.path.basename(f)
+        parts = base.split("_")
+        proba = float(parts[0])
+        if proba < min_proba: 
+            continue
+        antenna = "_".join(parts[1:-2])
+        dt_str = parts[-2] + " " + parts[-1].replace(".png","")
+        dt = datetime.strptime(dt_str, "%d-%m-%Y %H-%M-%S")
+        table_data.append([antenna, dt.strftime("%d-%m-%Y %H:%M:%S"), proba])
+
+    return img_data, table_data
 
 if __name__ == "__main__":
     # Glob folder structure
@@ -95,6 +134,13 @@ if __name__ == "__main__":
         gallery = gr.Gallery(
             object_fit="contain", elem_id="gallery", columns=[3], rows=[1]
         )
-        load_btn.click(load_images, [year, month, day, sort_by, min_proba], gallery)
+        table = gr.Dataframe(headers=["Antenna","Datetime","Probability"], wrap=True)
+        load_btn.click(load_images_and_table, [year, month, day, sort_by, min_proba], [gallery, table])
+        download_btn = gr.Button("Download CSV")
+        download_file = gr.File()  # outputs a file to download
+
+        download_btn.click(fn=download_csv,
+                        inputs=[year, month, day, sort_by, min_proba],
+                        outputs=download_file)
 
     demo.launch()

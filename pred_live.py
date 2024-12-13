@@ -42,6 +42,10 @@ INSTRUMENT_LIST = [
     "ITALY-Strassolt_01",
     "NORWAY-EGERSUND_01",
     "TRIEST_57",
+    "KASIA_59",
+    "MEXICO-LANCE-A_63",
+    "NORWAY-EGERSUND_01",
+    "SPAIN-SIGUENZA_02"
 ]
 
 
@@ -143,15 +147,22 @@ if __name__ == "__main__":
         ds_bursts = ds.filter(lambda x: x["pred"] > 0).select_columns(
             ["datetime", "antenna", "pred", "path"]
         )
+
+        # To dataframe for easier processing
         df_bursts = ds_bursts.to_pandas()
+
+        # Create probabilities from logits
         df_bursts["proba"] = df_bursts["pred"].apply(lambda x: sigmoid(x))
 
         # Generate and save plots
         for i, row in df_bursts.iterrows():
+            # Create figure
             data = get_ecallisto_data(
                 row["datetime"], row["datetime"] + timedelta(minutes=15), row["antenna"]
             )[row["antenna"]]
             fig = plot_spectrogram(subtract_constant_background(data).clip(0, 16))
+
+            # Save figure
             year = row["datetime"].year
             month = f'{row["datetime"].month:02d}'
             day = f'{row["datetime"].day:02d}'
