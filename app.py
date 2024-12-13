@@ -8,7 +8,6 @@ import pandas as pd
 BASE_PATH = os.path.join(os.getcwd(), "burst_plots")
 
 
-
 def load_images(year, month, day, sort_by, min_proba):
     # Collect all images in all antenna subfolders for the given day
     search_path = os.path.join(BASE_PATH, year, month, day, "*", "*")
@@ -50,8 +49,9 @@ def load_images(year, month, day, sort_by, min_proba):
 
 
 def table_to_df(table_data):
-    df = pd.DataFrame(table_data, columns=["Antenna", "Date", "Probability"])
+    df = pd.DataFrame(table_data, columns=["Antenna", "Datetime", "Probability"])
     return df
+
 
 def download_csv(year, month, day, sort_by, min_proba):
     # Return CSV for immediate download
@@ -74,14 +74,15 @@ def load_images_and_table(year, month, day, sort_by, min_proba):
         base = os.path.basename(f)
         parts = base.split("_")
         proba = float(parts[0])
-        if proba < min_proba: 
+        if proba < min_proba:
             continue
         antenna = "_".join(parts[1:-2])
-        dt_str = parts[-2] + " " + parts[-1].replace(".png","")
+        dt_str = parts[-2] + " " + parts[-1].replace(".png", "")
         dt = datetime.strptime(dt_str, "%d-%m-%Y %H-%M-%S")
         table_data.append([antenna, dt.strftime("%d-%m-%Y %H:%M:%S"), proba])
 
     return img_data, table_data
+
 
 if __name__ == "__main__":
     # Glob folder structure
@@ -134,13 +135,19 @@ if __name__ == "__main__":
         gallery = gr.Gallery(
             object_fit="contain", elem_id="gallery", columns=[3], rows=[1]
         )
-        table = gr.Dataframe(headers=["Antenna","Datetime","Probability"], wrap=True)
-        load_btn.click(load_images_and_table, [year, month, day, sort_by, min_proba], [gallery, table])
+        table = gr.Dataframe(headers=["Antenna", "Datetime", "Probability"], wrap=True)
+        load_btn.click(
+            load_images_and_table,
+            [year, month, day, sort_by, min_proba],
+            [gallery, table],
+        )
         download_btn = gr.Button("Download CSV")
         download_file = gr.File()  # outputs a file to download
 
-        download_btn.click(fn=download_csv,
-                        inputs=[year, month, day, sort_by, min_proba],
-                        outputs=download_file)
+        download_btn.click(
+            fn=download_csv,
+            inputs=[year, month, day, sort_by, min_proba],
+            outputs=download_file,
+        )
 
     demo.launch()

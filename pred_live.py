@@ -31,13 +31,11 @@ torch.set_float32_matmul_precision("high")
 
 # Parameters
 INSTRUMENT_LIST = [
-    "Australia-ASSA_02",
     "Australia-ASSA_62",
     "ALASKA-HAARP_62",
     "AUSTRIA-UNIGRAZ_01",
     "BIR_01",
     "GERMANY-DLR_63",
-    "GERMANY-ESSEN_58",
     "HUMAIN_59",
     "ITALY-Strassolt_01",
     "NORWAY-EGERSUND_01",
@@ -45,7 +43,9 @@ INSTRUMENT_LIST = [
     "KASIA_59",
     "MEXICO-LANCE-A_63",
     "NORWAY-EGERSUND_01",
-    "SPAIN-SIGUENZA_02"
+    "SPAIN-SIGUENZA_02",
+    "INDIA-OOTY_02",
+    "EGYPT-Alexandria_02",
 ]
 
 
