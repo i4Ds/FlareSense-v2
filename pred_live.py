@@ -128,6 +128,10 @@ if __name__ == "__main__":
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     start_time = now - timedelta(hours=2)
 
+    # Print some logs, like start time and end time
+    print(f"Start time: {start_time}")
+    print(f"End time: {now}")
+
     # Temporary directory for parquet data
     tmp_dir = tempfile.mkdtemp()
 
@@ -143,6 +147,8 @@ if __name__ == "__main__":
 
         # Prepare dataset and dataloaders
         ds_e = prepare_ecallisto_datasets(ds, config)
+        print(f"Predicting on {len(ds_e)} samples.")
+
         data_loader = prepare_dataloaders(ds_e, batch_size=32)
 
         # Generate predictions
@@ -156,6 +162,8 @@ if __name__ == "__main__":
 
         # To dataframe for easier processing
         df_bursts = ds_bursts.to_pandas()
+
+        print(f"Number of bursts: {len(df_bursts)}")
 
         # Create probabilities from logits
         df_bursts["proba"] = df_bursts["pred"].apply(lambda x: sigmoid(x))
