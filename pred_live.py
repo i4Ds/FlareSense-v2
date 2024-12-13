@@ -87,7 +87,11 @@ def load_model(checkpoint_path: str, config_path: str):
         learning_rate=1000,
         label_smoothing=0.0,
     )
-    checkpoint = torch.load(checkpoint_path, weights_only=True)
+    checkpoint = torch.load(
+        checkpoint_path,
+        weights_only=True,
+        map_location="cuda" if torch.cuda.is_available() else "cpu",
+    )
     model.load_state_dict(checkpoint["state_dict"])
     return model, config
 
