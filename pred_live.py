@@ -119,6 +119,7 @@ def prepare_dataloaders(ds: EcallistoDatasetBinary, batch_size: int):
 
 
 if __name__ == "__main__":
+    print(4 * "=" + " PREDICTION " + 4 * "=")
     from app import BASE_PATH
 
     checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
@@ -191,3 +192,4 @@ if __name__ == "__main__":
 
     finally:
         shutil.rmtree(tmp_dir)
+        print(4 * "-" + " END " + 4 * "-")
