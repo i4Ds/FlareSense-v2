@@ -137,7 +137,9 @@ if __name__ == "__main__":
 
     try:
         # Create parquet data from instruments
-        create_overlapping_parquets(start_time, now, INSTRUMENT_LIST, tmp_dir)
+        create_overlapping_parquets(
+            start_time, now, INSTRUMENT_LIST, tmp_dir, verbose=False
+        )
 
         # Load dataset and model
         ds = load_radio_dataset(tmp_dir)
