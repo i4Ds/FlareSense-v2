@@ -162,9 +162,9 @@ wandb/*
 lightning_logs/*
 logs/*
 FlareSense-v2/**/*.ckpt
-*.png
 *.ckpt
 **/metadata.csv
 original_labels/*
 *.csv
 flaresense-data/*
+burst_plots/*
