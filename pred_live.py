@@ -133,6 +133,8 @@ if __name__ == "__main__":
 
         # Load dataset and model
         ds = load_radio_dataset(tmp_dir)
+        if ds is None:
+            raise ValueError("No data found in parquet files.")
         model, config = load_model(checkpoint_path, CONFIG_PATH)
 
         # Prepare dataset and dataloaders
@@ -145,7 +147,7 @@ if __name__ == "__main__":
 
         # Filter bursts
         ds_bursts = ds.filter(lambda x: x["pred"] > 0).select_columns(
-            ["datetime", "antenna", "pred", "path"]
+            ["datetime", "antenna", "pred"]
         )
 
         # To dataframe for easier processing
