@@ -1,7 +1,6 @@
 import torch
 import yaml
 import os
-import glob
 from datetime import datetime, timedelta, timezone
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
@@ -124,7 +123,11 @@ def predict_from_to(start_datetime, end_datetime, model, config):
     try:
         # Create parquet data from instruments
         create_overlapping_parquets(
-            start_datetime, end_datetime, INSTRUMENT_LIST, tmp_dir
+            start_datetime,
+            end_datetime,
+            INSTRUMENT_LIST,
+            tmp_dir,
+            download_from_local=True,
         )
 
         # Load dataset and model
