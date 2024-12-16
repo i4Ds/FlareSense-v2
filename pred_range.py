@@ -181,7 +181,10 @@ def predict_from_to(start_datetime, end_datetime, model, config):
 
 
 if __name__ == "__main__":
-    from app import BASE_PATH
+    BASE_PATH = "output_burst_images"
+
+    if not os.path.exists(BASE_PATH):
+        os.makedirs(BASE_PATH)
 
     checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
     device = "cuda" if torch.cuda.is_available() else "cpu"
