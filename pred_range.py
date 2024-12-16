@@ -22,6 +22,7 @@ import numpy as np
 import tempfile
 import shutil
 import time
+import pandas as pd
 
 # Model Parameters
 REPO_ID = "i4ds/flaresense"
@@ -196,31 +197,10 @@ if __name__ == "__main__":
     # Put model on device
     model.to(device)
 
-    while True:
-        print(4 * "=" + " PREDICTION " + 4 * "=")
-        now = datetime.now(timezone.utc)
+    # Predict between two ranges
+    start_datetime = datetime(2024, 12, 10, 13, 0, 0, tzinfo=timezone.utc)
+    end_datetime = datetime(2024, 12, 16, 16, 0, 0, tzinfo=timezone.utc)
 
-        # Calculate the next two-hour mark
-        next_run = now.replace(minute=0, second=0, microsecond=0) + timedelta(
-            hours=(now.hour % 2) + 2
-        )
-
-        # Sleep for the time until the next two-hour mark
-        ts = (next_run - now).total_seconds()
-        print(
-            f"Next run at: {next_run} UTC. I will sleep for {ts} seconds.", flush=True
-        )
-        time.sleep(ts)
-
-        print(4 * "-" + " START " + 4 * "-")
-        # Prepare time range
-        now_minus_2h = (datetime.now(timezone.utc) - timedelta(hours=2)).replace(
-            second=0, microsecond=0
-        )
-
-        # Print some logs, like start time and end time
-        print(f"Start time: {now_minus_2h - timedelta(hours=2)}")
-        print(f"End time: {now_minus_2h }")
-
-        # Predict
-        predict_from_to(now_minus_2h - timedelta(hours=2), now_minus_2h, model, config)
+    # Split it up into days, to avoid too much data
+    for day in pd.date_range(start_datetime, end_datetime, freq="D", inclusive="left"):
+        predict_from_to(day, day + timedelta(days=1), model, config)
