@@ -139,7 +139,7 @@ def predict_from_to(start_datetime, end_datetime, model, config):
         ds_e = prepare_ecallisto_datasets(ds, config)
         print(f"Predicting on {len(ds_e)} samples.")
 
-        data_loader = prepare_dataloaders(ds_e, batch_size=32)
+        data_loader = prepare_dataloaders(ds_e, batch_size=8)
 
         # Generate predictions
         preds = create_logits(model, data_loader)

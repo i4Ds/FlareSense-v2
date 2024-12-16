@@ -8,66 +8,25 @@ import pandas as pd
 BASE_PATH = os.path.join("/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images")
 
 
-def load_images(year, month, day, sort_by, min_proba):
-    # Collect all images in all antenna subfolders for the given day
-    search_path = os.path.join(BASE_PATH, year, month, day, "*", "*")
-    files = glob.glob(search_path)
-    if not files:
-        return ["style/DALLE_ERROR.png"]
-
-    # Parse filenames: "{proba}_{antenna}_{dd-mm-YYYY HH_MM_SS}.png"
-    # Example: "90.47_AUSTRIA-UNIGRAZ_01_12-12-2024 07_29_13.png"
+def load_images(table, sort_by):
     img_data = []
-    for f in files:
-        base = os.path.basename(f)
-        # Split by underscore: [proba, antenna_part(s), day-month-year, hour_min_sec.png]
-        # There's an unknown number of underscores in antenna name, so we split and rejoin carefully:
-        parts = base.split("_")
-        proba_str = parts[0]  # "90.47"
-        proba = float(proba_str)
-        # Antenna might contain underscores, join all but last two parts back for antenna
-        # Last two parts form date and time: "12-12-2024" and "07_29_13.png"
-        antenna = "_".join(parts[1:-2])
-        date_str = parts[-2]
-        time_str = parts[-1].replace(".png", "")
-        # Combine date_str and time_str into datetime
-        dt_str = date_str + " " + time_str
-        dt = datetime.strptime(dt_str, "%d-%m-%Y %H-%M-%S")
-        img_data.append((f, proba, dt))
-
-    if sort_by == "Probability":
-        img_data.sort(key=lambda x: x[1], reverse=True)  # Sort by proba
-    else:
-        img_data.sort(key=lambda x: x[2], reverse=True)  # Sort by time
+    for _, row in table.iterrows():
+        img_data.append((row["Path"], row["Probability"]))
 
     # Min proba
-    img_data = [x for x in img_data if x[1] >= min_proba]
     if len(img_data) == 0:
         return ["style/DALLE_ERROR.png"]
+
+    # Sort
+    if sort_by == "Probability":
+        img_data.sort(key=lambda x: x[1], reverse=True)
+    else:
+        img_data.sort(key=lambda x: x[0], reverse=True)
 
     return [(x[0], f"Probability: {x[1]:.2f}") for x in img_data]
 
 
-def table_to_df(table_data):
-    df = pd.DataFrame(table_data, columns=["Antenna", "Datetime", "Probability"])
-    return df
-
-
-def download_csv(year, month, day, sort_by, min_proba):
-    # Return CSV for immediate download
-    _, table_data = load_images_and_table(year, month, day, sort_by, min_proba)
-    df = table_to_df(table_data)
-    tmp_dir = tempfile.mkdtemp()
-    csv_path = os.path.join(tmp_dir, f"FlareSense_BurstPlots_{year}_{month}_{day}.csv")
-    df.to_csv(csv_path, index=False)
-    return csv_path
-
-
-def load_images_and_table(year, month, day, sort_by, min_proba):
-    img_data = load_images(year, month, day, sort_by, min_proba)  # from your code
-    # Reload or reuse logic to produce table_data
-    # Example: for each image path, parse antenna, dt, proba
-    # Return both gallery data and table
+def load_image_paths(year, month, day, min_proba):
     table_data = []
     search_path = os.path.join(BASE_PATH, year, month, day, "*", "*")
     for f in glob.glob(search_path):
@@ -79,9 +38,29 @@ def load_images_and_table(year, month, day, sort_by, min_proba):
         antenna = "_".join(parts[1:-2])
         dt_str = parts[-2] + " " + parts[-1].replace(".png", "")
         dt = datetime.strptime(dt_str, "%d-%m-%Y %H-%M-%S")
-        table_data.append([antenna, dt.strftime("%d-%m-%Y %H:%M:%S"), proba])
+        table_data.append([dt, antenna, proba, f])
+    df = pd.DataFrame(
+        table_data, columns=["Datetime", "Antenna", "Probability", "Path"]
+    ).sort_values(by="Datetime", ascending=True)
+    return df
 
-    return img_data, table_data
+
+def download_csv(year, month, day, min_proba):
+    # Return CSV for immediate download
+    df: pd.DataFrame = load_image_paths(year, month, day, min_proba).drop(
+        columns=["Path"]
+    )
+    tmp_dir = tempfile.mkdtemp()
+    csv_path = os.path.join(tmp_dir, f"FlareSense_BurstPlots_{year}_{month}_{day}.csv")
+    df.to_csv(csv_path, index=False)
+    return csv_path
+
+
+def load_images_and_table(year, month, day, sort_by, min_proba):
+    table_data = load_image_paths(year, month, day, min_proba)
+    img_data = load_images(table_data, sort_by)
+
+    return img_data, table_data.drop(columns=["Path"])
 
 
 if __name__ == "__main__":
@@ -133,9 +112,9 @@ if __name__ == "__main__":
 
         load_btn = gr.Button("Load Images")
         gallery = gr.Gallery(
-            object_fit="contain", elem_id="gallery", columns=[3], rows=[1]
+            object_fit="fill", elem_id="gallery", columns=[3], rows=[4], height="auto"
         )
-        table = gr.Dataframe(headers=["Antenna", "Datetime", "Probability"], wrap=True)
+        table = gr.Dataframe(headers=["Datetime", "Antenna", "Probability"], wrap=True)
         load_btn.click(
             load_images_and_table,
             [year, month, day, sort_by, min_proba],
@@ -146,8 +125,10 @@ if __name__ == "__main__":
 
         download_btn.click(
             fn=download_csv,
-            inputs=[year, month, day, sort_by, min_proba],
+            inputs=[year, month, day, min_proba],
             outputs=download_file,
         )
 
-    demo.launch()
+    demo.launch(
+        allowed_paths=["/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images/"]
+    )
