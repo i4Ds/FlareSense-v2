@@ -93,16 +93,16 @@ if __name__ == "__main__":
         gr.Markdown(
             f"""
             <div style="border:1px solid #ccc; padding:15px; border-radius:5px;">
-            <h1 style="margin-top:0;">FlareSense by i4ds</h1>
+            <h1 style="margin-top:0;">FlareSense by <a href="https://i4ds.ch/" target="_blank">i4ds@fhnw</a></h1>
             <p style="font-size:1.1em;">
-            A tool for predicting solar radio bursts.\n
+            A tool for detecting solar radio bursts on <a href="https://www.e-callisto.org/" target="_blank">E-callisto</a> Data.\n
             Select a date, sorting mode, and probability threshold. Click on a image to increase its size.\n
             Predictions update every 2 hours, using data from:\n
             <b>{", ".join(INSTRUMENT_LIST)}</b>.
             </p>
             <p style="font-size:0.9em;">
             For more info, refer to our <a href="https://placeholder.link.to.paper" target="_blank">paper</a>.
-            For questions or comments, contact <a href="mailto:placeholder@placeholder.com" target="_blank">placeholder@placeholder.com</a>.
+            For questions or comments, contact <a href="mailto:vincenzo.timmel@fhnw.ch" target="_blank">vincenzo.timmel@fhnw.ch</a>.
             </p>
             </div>
             """
@@ -142,6 +142,4 @@ if __name__ == "__main__":
             outputs=download_file,
         )
 
-    demo.launch(
-        allowed_paths=["/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images/"]
-    )
+    demo.launch(allowed_paths=[BASE_PATH])
