@@ -5,7 +5,9 @@ import os, glob
 import tempfile
 import pandas as pd
 
-BASE_PATH = os.path.join(os.getcwd(), "burst_plots")
+BASE_PATH = os.path.join(
+    "/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images", "burst_plots"
+)
 
 
 def load_images(year, month, day, sort_by, min_proba):

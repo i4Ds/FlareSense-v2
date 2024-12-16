@@ -21,6 +21,7 @@ from ecallisto_ng.data_download.downloader import get_ecallisto_data
 import numpy as np
 import tempfile
 import shutil
+import time
 
 # Model Parameters
 REPO_ID = "i4ds/flaresense"
@@ -53,24 +54,22 @@ def sigmoid(x, T=T):
     return 1 / (1 + np.exp(-x / T))
 
 
-def create_logits(model: GrayScaleResNet, dataloader: DataLoader, device: str):
+def create_logits(model: GrayScaleResNet, dataloader: DataLoader):
     """
     Generate logits for all samples in a DataLoader.
 
     Args:
         model (GrayScaleResNet): The model used to generate logits.
         dataloader (DataLoader): DataLoader providing batches of input data.
-        device (str): The device to perform computation on ('cpu' or 'cuda').
 
     Returns:
         list: A list of logits for all samples in the DataLoader.
     """
     model.eval()
-    model.to(device)
     binary_logits = []
     with torch.no_grad():
         for inputs, _, _, _ in tqdm(dataloader):
-            y_hat = model(inputs.to(device)).squeeze(dim=1)
+            y_hat = model(inputs.to(model.device)).squeeze(dim=1)
             binary_logits.extend(y_hat.cpu().tolist())
     return binary_logits
 
@@ -118,35 +117,20 @@ def prepare_dataloaders(ds: EcallistoDatasetBinary, batch_size: int):
     )
 
 
-if __name__ == "__main__":
-    print(4 * "=" + " PREDICTION " + 4 * "=")
-    from app import BASE_PATH
-
-    checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # Prepare time range
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    start_time = now - timedelta(hours=2)
-
-    # Print some logs, like start time and end time
-    print(f"Start time: {start_time}")
-    print(f"End time: {now}")
-
+def predict_from_to(start_datetime, end_datetime, model, config):
     # Temporary directory for parquet data
     tmp_dir = tempfile.mkdtemp()
-
+    
     try:
         # Create parquet data from instruments
         create_overlapping_parquets(
-            start_time, now, INSTRUMENT_LIST, tmp_dir, verbose=False
+            start_datetime, end_datetime, INSTRUMENT_LIST, tmp_dir
         )
 
         # Load dataset and model
         ds = load_radio_dataset(tmp_dir)
         if ds is None:
             raise ValueError("No data found in parquet files.")
-        model, config = load_model(checkpoint_path, CONFIG_PATH)
 
         # Prepare dataset and dataloaders
         ds_e = prepare_ecallisto_datasets(ds, config)
@@ -155,7 +139,7 @@ if __name__ == "__main__":
         data_loader = prepare_dataloaders(ds_e, batch_size=32)
 
         # Generate predictions
-        preds = create_logits(model, data_loader, device)
+        preds = create_logits(model, data_loader)
         ds = ds.add_column("pred", preds)
 
         # Filter bursts
@@ -172,7 +156,7 @@ if __name__ == "__main__":
         df_bursts["proba"] = df_bursts["pred"].apply(lambda x: sigmoid(x))
 
         # Generate and save plots
-        for i, row in df_bursts.iterrows():
+        for _, row in df_bursts.iterrows():
             # Create figure
             data = get_ecallisto_data(
                 row["datetime"], row["datetime"] + timedelta(minutes=15), row["antenna"]
@@ -193,3 +177,47 @@ if __name__ == "__main__":
     finally:
         shutil.rmtree(tmp_dir)
         print(4 * "-" + " END " + 4 * "-")
+
+
+if __name__ == "__main__":
+    from app import BASE_PATH
+
+    checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    print(f"Using device: {device}")
+    print(f"Using checkpoint: {checkpoint_path}")
+    print(f"Using config: {CONFIG_PATH}")
+    print(f"Using model from {REPO_ID}")
+
+    # Load model
+    model, config = load_model(checkpoint_path, CONFIG_PATH)
+
+    # Put model on device
+    model.to(device)
+
+    while True:
+        print(4 * "=" + " PREDICTION " + 4 * "=")
+        now = datetime.now(timezone.utc)
+
+        # Calculate the next two-hour mark
+        next_run = now.replace(minute=0, second=0, microsecond=0) + timedelta(
+            hours=(now.hour % 2) + 2
+        )
+
+        print(f"Next run at: {next_run} UTC")
+
+        time.sleep((next_run - now).total_seconds())
+
+        print(4 * "-" + " START " + 4 * "-")
+        # Prepare time range
+        now_minus_2h = (datetime.now(timezone.utc) - timedelta(hours=2)).replace(
+            second=0, microsecond=0
+        )
+
+        # Print some logs, like start time and end time
+        print(f"Start time: {now_minus_2h - timedelta(hours=2)}")
+        print(f"End time: {now_minus_2h }")
+
+        # Predict
+        predict_from_to(now_minus_2h - timedelta(hours=2), now_minus_2h, model, config)
