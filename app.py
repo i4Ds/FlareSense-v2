@@ -125,7 +125,7 @@ if __name__ == "__main__":
 
         load_btn = gr.Button("Load Images")
         gallery = gr.Gallery(
-            object_fit="fill", elem_id="gallery", columns=[3], rows=[4], height="auto"
+            object_fit="fill", elem_id="gallery", columns=[3], rows=[1], height="auto"
         )
         table = gr.Dataframe(headers=["Datetime", "Antenna", "Probability"], wrap=True)
         load_btn.click(
