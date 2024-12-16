@@ -120,7 +120,7 @@ def prepare_dataloaders(ds: EcallistoDatasetBinary, batch_size: int):
 def predict_from_to(start_datetime, end_datetime, model, config):
     # Temporary directory for parquet data
     tmp_dir = tempfile.mkdtemp()
-    
+
     try:
         # Create parquet data from instruments
         create_overlapping_parquets(
@@ -205,9 +205,10 @@ if __name__ == "__main__":
             hours=(now.hour % 2) + 2
         )
 
-        print(f"Next run at: {next_run} UTC")
-
-        time.sleep((next_run - now).total_seconds())
+        # Sleep for the time until the next two-hour mark
+        ts = (next_run - now).total_seconds()
+        print(f"Next run at: {next_run} UTC. I will sleep for {ts} seconds.")
+        time.sleep(ts)
 
         print(4 * "-" + " START " + 4 * "-")
         # Prepare time range
