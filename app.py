@@ -60,7 +60,20 @@ def load_images_and_table(year, month, day, sort_by, min_proba):
     table_data = load_image_paths(year, month, day, min_proba)
     img_data = load_images(table_data, sort_by)
 
-    return img_data, table_data.drop(columns=["Path"])
+    table_data = (
+        table_data.drop(columns=["Path"])
+        .sort_values(by=["Datetime", "Antenna"], ascending=[True, True])
+        .groupby(["Datetime"])
+        .agg(
+            {
+                "Datetime": "first",
+                "Antenna": lambda x: ", ".join(set(x)),
+                "Probability": "mean",
+            }
+        )
+    )
+
+    return img_data, table_data.round(2)
 
 
 if __name__ == "__main__":
