@@ -42,6 +42,9 @@ def load_image_paths(year, month, day, min_proba):
     df = pd.DataFrame(
         table_data, columns=["Datetime", "Antenna", "Probability", "Path"]
     ).sort_values(by="Datetime", ascending=True)
+
+    # Filter out antennas not in INSTRUMENT_LIST
+    df = df[df["Antenna"].isin(INSTRUMENT_LIST)]
     return df
 
 
@@ -59,7 +62,6 @@ def download_csv(year, month, day, min_proba):
 def load_images_and_table(year, month, day, sort_by, min_proba):
     table_data = load_image_paths(year, month, day, min_proba)
     img_data = load_images(table_data, sort_by)
-
     table_data = (
         table_data.drop(columns=["Path"])
         .sort_values(by=["Datetime", "Antenna"], ascending=[True, True])
@@ -127,7 +129,7 @@ if __name__ == "__main__":
         gallery = gr.Gallery(
             object_fit="fill", elem_id="gallery", columns=[3], rows=[1], height="auto"
         )
-        table = gr.Dataframe(headers=["Datetime", "Antenna", "Probability"], wrap=True)
+        table = gr.Dataframe(headers=["Datetime", "Antenna", "Probability"], wrap=False)
         load_btn.click(
             load_images_and_table,
             [year, month, day, sort_by, min_proba],
