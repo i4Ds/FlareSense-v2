@@ -43,6 +43,7 @@ INSTRUMENT_LIST = [
     "INDIA-UDAIPUR_03",
     "MEXART_59",
     "MEXICO-LANCE-B_62",
+    "MEXICO-FCFM-UNACH_62",
     "NORWAY-EGERSUND_01",
     "ROMANIA_01",
     "ROSWELL-NM_59",
@@ -55,9 +56,12 @@ INSTRUMENT_LIST = [
     "UZBEKISTAN_01",
     "INDONESIA_59",
     "ITALY-Strassolt_01",
+    "INDIA-OOTY_02",
     "MONGOLIA-UB_01",
     "SWISS-IRSOL_01",
+    "SWISS-CalU_01",
     "SWISS-Landschlacht_62",
+    "HURBANOVO_59",
 ]
 
 

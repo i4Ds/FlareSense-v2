@@ -4,11 +4,12 @@ from datetime import datetime
 import os, glob
 import tempfile
 import pandas as pd
+from typing import List, Tuple
 
 BASE_PATH = os.path.join("/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images")
 
 
-def load_images(table, sort_by):
+def load_images(table, sort_by) -> List:
     if sort_by == "Probability":
         table = table.sort_values(by="Probability", ascending=False)
     else:
@@ -24,7 +25,7 @@ def load_images(table, sort_by):
     return [(x[0], f"Probability: {x[1]:.2f}") for x in img_data]
 
 
-def load_image_paths(year, month, day, min_proba):
+def load_image_paths(year, month, day, min_proba) -> pd.DataFrame:
     table_data = []
     search_path = os.path.join(BASE_PATH, year, month, day, "*", "*")
     for f in glob.glob(search_path):
@@ -46,19 +47,21 @@ def load_image_paths(year, month, day, min_proba):
     return df
 
 
-def download_csv(year, month, day, sort_by, min_proba, k):
+def download_csv(year, month, day, sort_by, min_proba, k) -> str:
     # Return CSV for immediate download
-    df: pd.DataFrame = load_images_and_table(year, month, day, sort_by, min_proba, k)
+    _, df = load_images_and_table(year, month, day, sort_by, min_proba, k)
     tmp_dir = tempfile.mkdtemp()
     csv_path = os.path.join(tmp_dir, f"FlareSense_BurstPlots_{year}_{month}_{day}.csv")
     df.to_csv(csv_path, index=False)
     return csv_path
 
 
-def load_images_and_table(year, month, day, sort_by, min_proba, k):
+def load_images_and_table(
+    year, month, day, sort_by, min_proba, k
+) -> Tuple[List, pd.DataFrame]:
     table_data = load_image_paths(year, month, day, min_proba)
     # Filter data by minimum number of stations
-    table_data = (
+    filtered_table = (
         table_data.drop(columns=["Path"])
         .sort_values(by=["Datetime", "Instrument Location"], ascending=[True, True])
         .groupby(["Datetime"])
@@ -70,17 +73,22 @@ def load_images_and_table(year, month, day, sort_by, min_proba, k):
             }
         )
         .reset_index(drop=True)
-    )
+    ).copy()
     # Calculate the number of unique stations per burst
-    table_data["count"] = table_data["Instrument Location"].apply(
+    filtered_table["count"] = filtered_table["Instrument Location"].apply(
         lambda x: len(x.split(","))
     )
 
     # Filter bursts detected by at least k stations
-    filtered_table = table_data[table_data["count"] >= k].drop(columns=["count"])
+    filtered_table: pd.DataFrame = filtered_table[filtered_table["count"] >= k].drop(
+        columns=["count"]
+    )
+
+    # Filter table data
+    table_data = table_data[table_data["Datetime"].isin(filtered_table["Datetime"])]
 
     # Load images
-    img_data = load_images(filtered_table, sort_by)
+    img_data = load_images(table_data, sort_by)
 
     return img_data, filtered_table.round(2)
 
@@ -104,8 +112,12 @@ if __name__ == "__main__":
             <div style="border:1px solid #ccc; padding:15px; border-radius:5px;">
             <h1 style="margin-top:0;">FlareSense by <a href="https://i4ds.ch/" target="_blank">i4ds@fhnw</a></h1>
             <p style="font-size:1.1em;">
-            A tool for detecting solar radio bursts on <a href="https://www.e-callisto.org/" target="_blank">E-callisto</a> Data.<br>
+
+            
+            <b>A tool for detecting solar radio bursts on <a href="https://www.e-callisto.org/" target="_blank">E-callisto</a> Data.<br></b>
             Select a date, sorting mode, probability threshold, and minimum number of stations. Click on an image to increase its size.<br>
+
+            
             Predictions update every 2 hours, using data from:<br>
             <b>{", ".join(INSTRUMENT_LIST)}</b>.
             </p>
@@ -127,7 +139,7 @@ if __name__ == "__main__":
             min_proba = gr.Slider(
                 minimum=50.0,
                 maximum=100.0,
-                value=50.0,
+                value=70.0,
                 label="Minimum Probability",
                 info="Filter by minimum probability",
             )
@@ -135,7 +147,7 @@ if __name__ == "__main__":
                 minimum=1,
                 maximum=5,
                 step=1,
-                value=2,
+                value=3,
                 label="Minimum Number of Stations (k)",
                 info="At least k stations must have detected the burst",
             )
