@@ -62,6 +62,9 @@ INSTRUMENT_LIST = [
     "SWISS-CalU_01",
     "SWISS-Landschlacht_62",
     "HURBANOVO_59",
+    "GLASGOW_01",
+    "GREENLAND_62",
+    "SRI-Lanka_59",
 ]
 
 
