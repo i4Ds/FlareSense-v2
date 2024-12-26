@@ -7,17 +7,17 @@ general:
 
 model:
   model_type: resnet34
-  input_size: [224, 224]
+  input_size: [128, 512]
   optimizer_name: adam
   lr: 0.0023439
   label_smoothing: 0.12465
   weight_decay: 8.9648e-7
 
 data:
-  train_path: i4ds/ecallisto_radio_sunburst
-  train_split: train
+  train_path: [i4ds/ecallisto_radio_sunburst, i4ds/ecallisto_radio_sunburst]
+  train_split: [train, val]
   val_path: i4ds/ecallisto_radio_sunburst
-  val_split: val
+  val_split: test
   test_path: i4ds/ecallisto_radio_sunburst
   test_split: test
   train_label_name: model_label

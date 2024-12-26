@@ -4,13 +4,13 @@ import os
 
 import torch
 import yaml
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision.transforms import Compose
-
+from torchvision.transforms import Resize
 import wandb
 from ecallisto_dataset import (
     CustomSpecAugment,
@@ -70,10 +70,12 @@ if __name__ == "__main__":
     print(dict(config))
 
     # Create dataset
-    ds_train = load_dataset(
-        config["data"]["train_path"],
-        split=config["data"]["train_split"],
-    )
+    # Train can be a list of datasets, so we need to iterate over them and then concatenate them
+    ds_train = []
+    for ds, split in zip(config["data"]["train_path"], config["data"]["train_split"]):
+        ds_train.append(load_dataset(ds, split=split))
+    ds_train = concatenate_datasets(ds_train)
+
     ds_valid = load_dataset(
         config["data"]["val_path"],
         split=config["data"]["val_split"],
@@ -93,11 +95,15 @@ if __name__ == "__main__":
         ds_valid = filter_antennas(ds_valid, config["data"]["antennas_val"])
 
     # Transforms
-    resize_func = Compose(
-        [
-            lambda x: custom_resize(x, tuple(config["model"]["input_size"])),
-        ]
-    )
+    if config["data"]["custom_resize"]:
+        resize_func = Compose(
+            [
+                lambda x: custom_resize(x, tuple(config["model"]["input_size"])),
+            ]
+        )
+    else:
+        resize_func = Resize(tuple(config["model"]["input_size"]))
+
     if config["data"]["use_augmentation"]:
         augm_before_resize = TimeWarpAugmenter(W=config["data"]["time_warp_w"])
         augm_after_resize = CustomSpecAugment(

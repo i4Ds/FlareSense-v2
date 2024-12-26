@@ -16,6 +16,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import Resize, ToTensor
 from torchvision.transforms.functional import pil_to_tensor
 from PIL import Image
+from torchvision.transforms.functional import to_pil_image
 
 
 # Dataset
@@ -228,6 +229,12 @@ class EcallistoDatasetBinary(EcallistoDataset):
 
         # Convert label to binary
         label = 0 if label.detach() == 0 else 1
+
+        # Save the image tensor as PNG if the index is 0
+        if index == 0:
+            pil_image = to_pil_image(image)  # Convert tensor to PIL image
+            pil_image.save("image_tensor.png")  # Save the image as PNG
+            print("Image tensor saved as PNG for index 0")
 
         return image, torch.tensor(label).float().unsqueeze(0), antenna, datetime
 

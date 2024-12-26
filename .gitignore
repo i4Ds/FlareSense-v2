@@ -168,3 +168,4 @@ original_labels/*
 *.csv
 flaresense-data/*
 burst_plots/*
+output_burst_images/*

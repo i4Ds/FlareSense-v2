@@ -1,7 +1,6 @@
 import torch
 import yaml
 import os
-import glob
 from datetime import datetime, timedelta, timezone
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose
@@ -21,7 +20,6 @@ from ecallisto_ng.data_download.downloader import get_ecallisto_data
 import numpy as np
 import tempfile
 import shutil
-import time
 import pandas as pd
 
 # Model Parameters
@@ -33,21 +31,32 @@ torch.set_float32_matmul_precision("high")
 
 # Parameters
 INSTRUMENT_LIST = [
-    "Australia-ASSA_62",
-    "ALASKA-HAARP_62",
+    "ALMATY_59",
+    "Australia-ASSA_57",
+    "Australia-ASSA_63",
     "AUSTRIA-UNIGRAZ_01",
-    "BIR_01",
+    "EGYPT-SpaceAgency_01",
     "GERMANY-DLR_63",
     "HUMAIN_59",
-    "ITALY-Strassolt_01",
+    "INDIA-GAURI_59",
+    "INDIA-UDAIPUR_03",
+    "MEXART_59",
+    "MEXICO-LANCE-B_62",
     "NORWAY-EGERSUND_01",
+    "ROMANIA_01",
+    "ROSWELL-NM_59",
+    "SSRT_59",
     "TRIEST_57",
-    "KASIA_59",
-    "MEXICO-LANCE-A_63",
-    "NORWAY-EGERSUND_01",
-    "SPAIN-SIGUENZA_02",
-    "INDIA-OOTY_02",
-    "EGYPT-Alexandria_02",
+    "ALASKA-HAARP_62",
+    "KASI_59",
+    "Malaysia-Banting_01",
+    "MONGOLIA-UB_01",
+    "UZBEKISTAN_01",
+    "INDONESIA_59",
+    "ITALY-Strassolt_01",
+    "MONGOLIA-UB_01",
+    "SWISS-IRSOL_01",
+    "SWISS-Landschlacht_62",
 ]
 
 
@@ -205,9 +214,12 @@ if __name__ == "__main__":
     model.to(device)
 
     # Predict between two ranges
-    start_datetime = datetime(2024, 12, 10, 13, 0, 0, tzinfo=timezone.utc)
-    end_datetime = datetime(2024, 12, 16, 16, 0, 0, tzinfo=timezone.utc)
+    start_datetime = datetime(2024, 12, 18, 0, 0, 0, tzinfo=timezone.utc)
+    end_datetime = datetime(2024, 12, 18, 22, 0, 0, tzinfo=timezone.utc)
 
-    # Split it up into days, to avoid too much data
-    for day in pd.date_range(start_datetime, end_datetime, freq="D", inclusive="left"):
-        predict_from_to(day, day + timedelta(days=1), model, config)
+    # Split it up into two-hour steps
+    for start_time in pd.date_range(
+        start_datetime, end_datetime, freq="2h", inclusive="both"
+    ):
+        end_time = start_time + timedelta(hours=2)
+        predict_from_to(start_time, end_time, model, config)
