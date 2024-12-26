@@ -165,7 +165,7 @@ class EcallistoDataset(Dataset):
         image = self.augment_image(image)
 
         # Min max scale image
-        image = global_min_max_scale(image)
+        image = min_max_scaler(image, (0, 1))
 
         # Create example
         example[self.label_name] = torch.tensor(example[self.label_name])
@@ -192,7 +192,7 @@ class EcallistoDatasetLive(Dataset):
         image = self.dataset[index]
         tensor = pil_to_tensor(image).float()
         tensor = tensor.squeeze(0)
-        tensor = global_min_max_scale(tensor)
+        tensor = min_max_scaler(tensor)
 
         label = label.squeeze(0)
 
@@ -315,8 +315,8 @@ class EcallistoBarlowDataset(EcallistoDataset):
         image_aug2 = self.augment_image(image.clone())
 
         # Min-max scale the augmented images
-        image_aug1 = global_min_max_scale(image_aug1)
-        image_aug2 = global_min_max_scale(image_aug2)
+        image_aug1 = min_max_scaler_scale(image_aug1)
+        image_aug2 = min_max_scaler_scale(image_aug2)
 
         # Prepare the output example
         example[self.label_name] = torch.tensor(example[self.label_name])
@@ -510,6 +510,11 @@ def custom_resize(spectrogram, target_size):
     return spectrogram
 
 
+def normal_resize(spectrogram, target_size):
+    resize = Resize(target_size)
+    return resize(spectrogram.unsqueeze(0)).squeeze(0)
+
+
 def custom_resize_height(spectrogram, target_size):
     resize = Resize((target_size[0], spectrogram.shape[1]))
     return resize(spectrogram.unsqueeze(0)).squeeze(0)
@@ -548,15 +553,38 @@ def remove_background(spectrogram):
     return background_removed
 
 
-def global_min_max_scale(spectrogram):
-    # Calculate the global minimum and maximum
-    min_value = torch.min(spectrogram)
-    max_value = torch.max(spectrogram)
+def min_max_scaler(tensor, feature_range=(0, 1)):
+    """
+    Apply Min-Max scaling to a PyTorch tensor.
 
-    # Apply global Min-Max scaling
-    scaled_spectrogram = (spectrogram - min_value) / (max_value - min_value)
+    Args:
+        tensor (torch.Tensor): Input tensor to scale.
+        feature_range (tuple): Desired range of transformed data (default is (0, 1)).
 
-    return scaled_spectrogram
+    Returns:
+        torch.Tensor: Scaled tensor.
+    """
+    min_val, max_val = feature_range
+    tensor_min = tensor.min()
+    tensor_max = tensor.max()
+    scaled_tensor = (tensor - tensor_min) / (tensor_max - tensor_min)
+    scaled_tensor = scaled_tensor * (max_val - min_val) + min_val
+    return scaled_tensor
+
+
+def clip_tensor(tensor, min_val, max_val):
+    """
+    Clip (limit) the values in a PyTorch tensor.
+
+    Args:
+        tensor (torch.Tensor): Input tensor.
+        min_val (float): Minimum value to clip to.
+        max_val (float): Maximum value to clip to.
+
+    Returns:
+        torch.Tensor: Clipped tensor.
+    """
+    return torch.clamp(tensor, min=min_val, max=max_val)
 
 
 def randomly_reduce_class_samples(dataset, target_class, fraction_to_keep):

@@ -10,16 +10,17 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision.transforms import Compose
-from torchvision.transforms import Resize
 import wandb
 from ecallisto_dataset import (
     CustomSpecAugment,
     EcallistoDatasetBinary,
     TimeWarpAugmenter,
     custom_resize,
+    normal_resize,
     filter_antennas,
     randomly_reduce_class_samples,
     remove_background,
+    clip_tensor,
 )
 from ecallisto_model import GrayScaleResNet
 
@@ -102,15 +103,31 @@ if __name__ == "__main__":
             ]
         )
     else:
-        resize_func = Resize(tuple(config["model"]["input_size"]))
+        resize_func = Compose(
+            [
+                lambda x: normal_resize(x, tuple(config["model"]["input_size"])),
+            ]
+        )
 
     if config["data"]["use_augmentation"]:
         augm_before_resize = TimeWarpAugmenter(W=config["data"]["time_warp_w"])
-        augm_after_resize = CustomSpecAugment(
-            frequency_masking_para=config["data"]["frequency_masking_para"],
-            time_masking_para=config["data"]["time_masking_para"],
-            method=config["data"]["freq_mask_method"],
-        )
+        if config["data"]["clip_to_range"]:
+            augm_after_resize = Compose(
+                [
+                    lambda x: clip_tensor(x, (0, 16)),
+                    CustomSpecAugment(
+                        frequency_masking_para=config["data"]["frequency_masking_para"],
+                        time_masking_para=config["data"]["time_masking_para"],
+                        method=config["data"]["freq_mask_method"],
+                    ),
+                ]
+            )
+        else:
+            augm_after_resize = CustomSpecAugment(
+                frequency_masking_para=config["data"]["frequency_masking_para"],
+                time_masking_para=config["data"]["time_masking_para"],
+                method=config["data"]["freq_mask_method"],
+            )
     else:
         augm_before_resize = None
         augm_after_resize = None

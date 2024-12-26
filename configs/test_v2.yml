@@ -28,6 +28,7 @@ data:
   antennas_test: []
   reduce_non_burst: False
   custom_resize: True
+  clip_to_range: False
   train_class_to_reduce: 0
   reduction_fraction: 0.2
   use_augmentation: True
