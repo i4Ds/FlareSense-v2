@@ -147,7 +147,7 @@ if __name__ == "__main__":
                 minimum=1,
                 maximum=5,
                 step=1,
-                value=3,
+                value=2,
                 label="Minimum Number of Stations (k)",
                 info="At least k stations must have detected the burst",
             )
