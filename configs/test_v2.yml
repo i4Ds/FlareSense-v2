@@ -20,8 +20,8 @@ data:
   val_split: test
   test_path: i4ds/ecallisto_radio_sunburst
   test_split: test
-  train_label_name: model_label
-  val_label_name: model_label
+  train_label_name: manual_label
+  val_label_name: manual_label
   test_label_name: manual_label
   antennas_train: []
   antennas_val: []
