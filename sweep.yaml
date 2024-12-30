@@ -35,7 +35,8 @@ parameters:
         min: 300
       custom_resize:
         values: [True, False]
-
+      optimizer_name:
+        values: [adam, adamw]
 
 
 command:

@@ -111,7 +111,6 @@ class EcallistoBase(LightningModule):
             loss = self.loss_function(y_hat, y)
         return loss
 
-
     def validation_step(self, batch, batch_idx):
         x, y, antennas, _ = batch  # Antennas is the third position
         y_hat = self(x)
@@ -121,11 +120,13 @@ class EcallistoBase(LightningModule):
         self.log("val_loss", loss, prog_bar=True, on_epoch=True, on_step=False)
 
         # Store predictions, ground truths, and antennas for group-wise metrics
-        self.validation_outputs.append({
-            "y_hat": y_hat,
-            "y": y,
-            "antennas": antennas,
-        })
+        self.validation_outputs.append(
+            {
+                "y_hat": y_hat,
+                "y": y,
+                "antennas": antennas,
+            }
+        )
 
     def on_validation_epoch_start(self):
         # Reset the validation outputs storage
@@ -153,7 +154,7 @@ class EcallistoBase(LightningModule):
         self.log("val_avg_f1", avg_f1, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
-        x, y, _, antennas = batch  # Antennas is the third position
+        x, y, antennas, _ = batch  # Antennas is the third position
         y_hat = self(x)
 
         # Loss
@@ -161,11 +162,13 @@ class EcallistoBase(LightningModule):
         self.log("test_loss", loss, prog_bar=True, on_epoch=True, on_step=False)
 
         # Store predictions, ground truths, and antennas for group-wise metrics
-        self.test_outputs.append({
-            "y_hat": y_hat,
-            "y": y,
-            "antennas": antennas,
-        })
+        self.test_outputs.append(
+            {
+                "y_hat": y_hat,
+                "y": y,
+                "antennas": antennas,
+            }
+        )
 
     def on_test_epoch_start(self):
         # Reset the test outputs storage
@@ -183,19 +186,19 @@ class EcallistoBase(LightningModule):
         antenna_precision_scores = []
         antenna_recall_scores = []
         antenna_f1_scores = []
-        
+
         for antenna, values in grouped_metrics.items():
             y_hat_group = torch.cat(values["y_hat"])
             y_group = torch.cat(values["y"])
-            
+
             precision = self.precision(y_hat_group, y_group)
             recall = self.recall(y_hat_group, y_group)
             f1 = self.f1_score(y_hat_group, y_group)
-            
+
             antenna_precision_scores.append(precision)
             antenna_recall_scores.append(recall)
             antenna_f1_scores.append(f1)
-            
+
             # Log metrics per antenna
             self.log(f"test_precision_{antenna}", precision, prog_bar=False)
             self.log(f"test_recall_{antenna}", recall, prog_bar=False)
@@ -205,7 +208,7 @@ class EcallistoBase(LightningModule):
         avg_precision = torch.mean(torch.tensor(antenna_precision_scores))
         avg_recall = torch.mean(torch.tensor(antenna_recall_scores))
         avg_f1 = torch.mean(torch.tensor(antenna_f1_scores))
-        
+
         self.log("test_avg_precision", avg_precision, prog_bar=True)
         self.log("test_avg_recall", avg_recall, prog_bar=True)
         self.log("test_avg_f1", avg_f1, prog_bar=True)
@@ -216,13 +219,11 @@ class EcallistoBase(LightningModule):
             # Save the model manually
             model_path = "final_model.pth"
             torch.save(self.state_dict(), model_path)
-            
+
             # Log the saved model to wandb
             artifact = wandb.Artifact("final_model", type="model")
             artifact.add_file(model_path)
             wandb.log_artifact(artifact)
-
-
 
     def configure_optimizers(self):
         # Initialize optimizer
@@ -231,22 +232,22 @@ class EcallistoBase(LightningModule):
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
         )
-        
+
         # Initialize scheduler
         scheduler = LinearLR(
             optimizer,
             start_factor=1.0,  # Starting factor for LR (1.0 = initial LR)
-            end_factor=0.0,    # Final factor for LR (0.0 = fully decay to 0)
-            total_iters=self.max_epochs  # Total epochs for decay
+            end_factor=0.0,  # Final factor for LR (0.0 = fully decay to 0)
+            total_iters=self.max_epochs,  # Total epochs for decay
         )
-        
+
         # Return optimizer and scheduler
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
                 "interval": "epoch",  # Step every epoch
-                "frequency": 1,      # Frequency of stepping
+                "frequency": 1,  # Frequency of stepping
             },
         }
 

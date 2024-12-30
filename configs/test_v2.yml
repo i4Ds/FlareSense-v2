@@ -33,6 +33,6 @@ data:
   reduction_fraction: 0.2
   use_augmentation: True
   frequency_masking_para: 77
-  time_masking_para: 33
+  time_masking_para: 155
   freq_mask_method: min
   time_warp_w: 613

@@ -9,4 +9,4 @@
 #SBATCH --error=logs/%j.err
 
 export HF_HOME=/tmp/vincenzo/huggingface
-wandb agent vincenzo-timmel/FlareSense-v2/vk7cvi17
+python main.py --config configs/test_v2.yml
