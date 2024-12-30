@@ -8,7 +8,7 @@ from torchmetrics import ConfusionMatrix
 from torchmetrics.classification import F1Score, Precision, Recall
 from torchvision import models
 import wandb
-from torch.optim.lr_scheduler import LinearLR
+from torch.optim.lr_scheduler import LinearLR, SequentialLR
 
 RESNET_DICT = {
     "resnet18": models.resnet18,
@@ -32,6 +32,7 @@ class EcallistoBase(LightningModule):
         learning_rate,
         weight_decay,
         max_epochs,
+        warmup_epochs,
         label_smoothing=0.0,
     ):
         super().__init__()
@@ -68,6 +69,7 @@ class EcallistoBase(LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.max_epochs = max_epochs
+        self.warmup_epochs = warmup_epochs
 
     def training_step(self, batch, batch_idx):
         x, y, _, _ = batch
@@ -117,7 +119,14 @@ class EcallistoBase(LightningModule):
 
         # Loss
         loss = self._loss(y_hat, y)
-        self.log("val_loss", loss, prog_bar=True, on_epoch=True, on_step=False)
+        self.log(
+            "val_loss",
+            loss,
+            prog_bar=True,
+            on_epoch=True,
+            on_step=False,
+            batch_size=self.batch_size,
+        )
 
         # Store predictions, ground truths, and antennas for group-wise metrics
         self.validation_outputs.append(
@@ -159,7 +168,14 @@ class EcallistoBase(LightningModule):
 
         # Loss
         loss = self._loss(y_hat, y)
-        self.log("test_loss", loss, prog_bar=True, on_epoch=True, on_step=False)
+        self.log(
+            "test_loss",
+            loss,
+            prog_bar=True,
+            on_epoch=True,
+            on_step=False,
+            batch_size=self.batch_size,
+        )
 
         # Store predictions, ground truths, and antennas for group-wise metrics
         self.test_outputs.append(
@@ -233,12 +249,27 @@ class EcallistoBase(LightningModule):
             weight_decay=self.weight_decay,
         )
 
-        # Initialize scheduler
-        scheduler = LinearLR(
+        # Warm-up phase
+        warmup_scheduler = LinearLR(
             optimizer,
-            start_factor=1.0,  # Starting factor for LR (1.0 = initial LR)
-            end_factor=0.0,  # Final factor for LR (0.0 = fully decay to 0)
-            total_iters=self.max_epochs,  # Total epochs for decay
+            start_factor=0.1,  # Starting LR as a fraction of the initial LR
+            end_factor=1.0,  # End of warm-up phase
+            total_iters=self.warmup_epochs,
+        )
+
+        # Decay phase
+        decay_scheduler = LinearLR(
+            optimizer,
+            start_factor=1.0,
+            end_factor=0.0,
+            total_iters=self.max_epochs - self.warmup_epochs,
+        )
+
+        # Combine warm-up and decay
+        scheduler = SequentialLR(
+            optimizer,
+            schedulers=[warmup_scheduler, decay_scheduler],
+            milestones=[self.warmup_epochs],
         )
 
         # Return optimizer and scheduler
@@ -260,6 +291,7 @@ class GrayScaleResNet(EcallistoBase):
         optimizer_name,
         learning_rate,
         max_epochs,
+        warmup_epochs,
         weight_decay=None,
         label_smoothing=None,
         class_weights=None,
@@ -273,6 +305,7 @@ class GrayScaleResNet(EcallistoBase):
             optimizer_name=optimizer_name,
             learning_rate=learning_rate,
             max_epochs=max_epochs,
+            warmup_epochs=warmup_epochs,
             weight_decay=weight_decay,
             label_smoothing=label_smoothing,
         )

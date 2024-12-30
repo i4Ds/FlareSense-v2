@@ -9,4 +9,7 @@
 #SBATCH --error=logs/%j.err
 
 export HF_HOME=/tmp/vincenzo/huggingface
-wandb agent vincenzo-timmel/FlareSense-v2/vk7cvi17
+export TRANSFORMERS_CACHE=/tmp/vincenzo/huggingface/transformers
+export HF_DATASETS_CACHE=/tmp/vincenzo/huggingface/datasets
+
+wandb agent vincenzo-timmel/FlareSense-v2/vls3ikqq

@@ -1,6 +1,6 @@
 general:
   batch_size: 64
-  max_epochs: 20
+  max_epochs: 100
   binary: True
   use_random_sampler: False
   use_class_weights: True
@@ -8,7 +8,8 @@ general:
 model:
   model_type: resnet34
   input_size: [128, 512]
-  optimizer_name: adam
+  optimizer_name: adamw
+  warmup_epochs: 1
   lr: 0.0023439
   label_smoothing: 0.12465
   weight_decay: 8.9648e-7
@@ -27,7 +28,7 @@ data:
   antennas_val: []
   antennas_test: []
   reduce_non_burst: False
-  custom_resize: True
+  custom_resize: False
   clip_to_range: False
   train_class_to_reduce: 0
   reduction_fraction: 0.2
@@ -35,4 +36,4 @@ data:
   frequency_masking_para: 77
   time_masking_para: 155
   freq_mask_method: min
-  time_warp_w: 613
+  time_warp_w: 450

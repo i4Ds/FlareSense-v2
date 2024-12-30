@@ -60,6 +60,7 @@ if __name__ == "__main__":
             _stats_disk_paths=("/mnt/nas05/data01/vincenzo/", "/"),
         ),
     ),
+
     wandb_logger = WandbLogger(log_model=False)  # Push it only on training end.
 
     # Overwrite config with wandb config (for sweep etc.)
@@ -161,7 +162,8 @@ if __name__ == "__main__":
         ds_train,
         sampler=sampler,
         batch_size=config["general"]["batch_size"],
-        num_workers=8,
+        num_workers=4,
+        prefetch_factor=4,
         pin_memory=True,
         shuffle=False if sampler is not None else True,
         persistent_workers=True,
@@ -170,7 +172,8 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(
         ds_valid,
         batch_size=config["general"]["batch_size"],
-        num_workers=8,
+        num_workers=4,
+        prefetch_factor=4,
         pin_memory=True,
         shuffle=False,
         persistent_workers=True,
@@ -187,6 +190,7 @@ if __name__ == "__main__":
         batch_size=config["general"]["batch_size"],
         optimizer_name=config["model"]["optimizer_name"],
         max_epochs=config["general"]["max_epochs"],
+        warmup_epochs=config["model"]["warmup_epochs"],
         learning_rate=config["model"]["lr"],
         weight_decay=config["model"]["weight_decay"],
         label_smoothing=config["model"]["label_smoothing"],
@@ -199,7 +203,6 @@ if __name__ == "__main__":
         logger=wandb_logger,
         enable_progress_bar=False,
         val_check_interval=1.0,  # Every Epoch.
-        fast_dev_run=2,
         # callbacks=[checkpoint_callback_f1, early_stopping_callback],
         callbacks=[lr_monitor],
     )

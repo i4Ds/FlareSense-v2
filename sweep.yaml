@@ -4,22 +4,30 @@ method: bayes
 project: FlareSense-v2
 entity: vincenzo-timmel
 metric:
-  name: test_f1
+  name: test_avg_f1
   goal: maximize
 parameters:
+  general:
+    parameters:
+      max_epochs:
+        max: 100
+        min: 30
   model:
     parameters:
       lr:
         max: 1.0e-3
         min: 1.0e-6
       label_smoothing:
-        max: 0.4
+        max: 0.2
         min: 0.0
       model_type:
         values: [resnet18, resnet34]
       weight_decay:
         max: 1.0e-3
         min: 1.0e-9
+      warmup_epochs:
+        max: 20
+        min: 3
   data:
     parameters:
       freq_mask_method:
@@ -28,15 +36,11 @@ parameters:
         max: 40
         min: 0
       time_masking_para:
-        max: 180
+        max: 90
         min: 0
       time_warp_w:
-        max: 800
+        max: 450
         min: 300
-      custom_resize:
-        values: [True, False]
-      optimizer_name:
-        values: [adam, adamw]
 
 
 command:
