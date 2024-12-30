@@ -188,9 +188,10 @@ if __name__ == "__main__":
     # Early stopping based on validation loss
     early_stopping_callback = EarlyStopping(
         monitor="val_loss",
-        patience=3,  # It's 3 Epochs.
+        patience=5,  # It's 3 Epochs.
         verbose=True,
         mode="min",
+        min_delta=0.001,
     )
 
     # Setup Model
