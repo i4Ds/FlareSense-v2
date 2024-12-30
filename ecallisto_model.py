@@ -1,7 +1,6 @@
 # Modeling
 # Visualization
-import matplotlib.pyplot as plt
-import seaborn as sns
+from collections import defaultdict
 import torch
 import torch.nn.functional as F
 from pytorch_lightning import LightningModule
@@ -9,6 +8,7 @@ from torchmetrics import ConfusionMatrix
 from torchmetrics.classification import F1Score, Precision, Recall
 from torchvision import models
 import wandb
+from torch.optim.lr_scheduler import LinearLR
 
 RESNET_DICT = {
     "resnet18": models.resnet18,
@@ -31,6 +31,7 @@ class EcallistoBase(LightningModule):
         optimizer_name,
         learning_rate,
         weight_decay,
+        max_epochs,
         label_smoothing=0.0,
     ):
         super().__init__()
@@ -66,6 +67,7 @@ class EcallistoBase(LightningModule):
         self.optimizer_name = optimizer_name
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
+        self.max_epochs = max_epochs
 
     def training_step(self, batch, batch_idx):
         x, y, _, _ = batch
@@ -109,128 +111,144 @@ class EcallistoBase(LightningModule):
             loss = self.loss_function(y_hat, y)
         return loss
 
+
     def validation_step(self, batch, batch_idx):
-        x, y, _, _ = batch
+        x, y, antennas, _ = batch  # Antennas is the third position
         y_hat = self(x)
-        # Metrics
-        self.precision(y_hat, y)
-        self.recall(y_hat, y)
-        self.f1_score(y_hat, y)
+
         # Loss
         loss = self._loss(y_hat, y)
-        self.log(
-            "val_loss",
-            loss,
-            prog_bar=True,
-            batch_size=self.batch_size,
-            on_epoch=True,
-            on_step=False,
-        )
+        self.log("val_loss", loss, prog_bar=True, on_epoch=True, on_step=False)
 
-        # Log the computed metrics
-        self.log(
-            "val_precision",
-            self.precision,
-            prog_bar=True,
-            batch_size=self.batch_size,
-            on_epoch=True,
-            on_step=False,
-        )
-        self.log(
-            "val_recall",
-            self.recall,
-            prog_bar=True,
-            batch_size=self.batch_size,
-            on_epoch=True,
-            on_step=False,
-        )
-        self.log(
-            "val_f1",
-            self.f1_score,
-            prog_bar=True,
-            batch_size=self.batch_size,
-            on_epoch=True,
-            on_step=False,
-        )
+        # Store predictions, ground truths, and antennas for group-wise metrics
+        self.validation_outputs.append({
+            "y_hat": y_hat,
+            "y": y,
+            "antennas": antennas,
+        })
+
+    def on_validation_epoch_start(self):
+        # Reset the validation outputs storage
+        self.validation_outputs = []
+
+    def on_validation_epoch_end(self):
+        # Group outputs by antenna
+        grouped_metrics = defaultdict(lambda: {"y_hat": [], "y": []})
+        for output in self.validation_outputs:
+            for i, antenna in enumerate(output["antennas"]):
+                grouped_metrics[antenna]["y_hat"].append(output["y_hat"][i])
+                grouped_metrics[antenna]["y"].append(output["y"][i])
+
+        # Calculate metrics per antenna
+        antenna_f1_scores = []
+        for antenna, values in grouped_metrics.items():
+            y_hat_group = torch.cat(values["y_hat"])
+            y_group = torch.cat(values["y"])
+            f1 = self.f1_score(y_hat_group, y_group)
+            antenna_f1_scores.append(f1)
+            self.log(f"val_f1_{antenna}", f1, prog_bar=False)
+
+        # Log averaged F1 score across antennas
+        avg_f1 = torch.mean(torch.tensor(antenna_f1_scores))
+        self.log("val_avg_f1", avg_f1, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
-        x, y, _, _ = batch
+        x, y, _, antennas = batch  # Antennas is the third position
         y_hat = self(x)
-
-        # Metrics
-        self.precision(y_hat, y)
-        self.recall(y_hat, y)
-        self.f1_score(y_hat, y)
-        self.confmat(y_hat, y)
 
         # Loss
         loss = self._loss(y_hat, y)
-        self.log(
-            "test_loss",
-            loss,
-            prog_bar=True,
-            batch_size=self.batch_size,
-            on_epoch=True,
-            on_step=False,
-        )
+        self.log("test_loss", loss, prog_bar=True, on_epoch=True, on_step=False)
 
-        # Log the computed metrics
-        self.log(
-            "test_precision",
-            self.precision,
-            prog_bar=True,
-            batch_size=self.batch_size,
-            on_epoch=True,
-            on_step=False,
-        )
-        self.log(
-            "test_recall",
-            self.recall,
-            prog_bar=True,
-            batch_size=self.batch_size,
-            on_epoch=True,
-            on_step=False,
-        )
-        self.log(
-            "test_f1",
-            self.f1_score,
-            prog_bar=True,
-            batch_size=self.batch_size,
-            on_epoch=True,
-            on_step=False,
-        )
+        # Store predictions, ground truths, and antennas for group-wise metrics
+        self.test_outputs.append({
+            "y_hat": y_hat,
+            "y": y,
+            "antennas": antennas,
+        })
+
+    def on_test_epoch_start(self):
+        # Reset the test outputs storage
+        self.test_outputs = []
 
     def on_test_epoch_end(self):
-        # Compute the confusion matrix
-        confmat = self.confmat.compute()
-        fig, ax = plt.subplots()
-        sns.heatmap(confmat.cpu().numpy(), annot=True, fmt="g", ax=ax)
-        ax.set_xlabel("Predicted labels")
-        ax.set_ylabel("True labels")
-        ax.set_title("Confusion Matrix")
+        # Group outputs by antenna
+        grouped_metrics = defaultdict(lambda: {"y_hat": [], "y": []})
+        for output in self.test_outputs:
+            for i, antenna in enumerate(output["antennas"]):
+                grouped_metrics[antenna]["y_hat"].append(output["y_hat"][i])
+                grouped_metrics[antenna]["y"].append(output["y"][i])
 
-        # Log the confusion matrix as an image to wandb
-        self.logger.experiment.log(
-            {"confusion_matrix": [wandb.Image(plt, caption="Test Confusion Matrix")]}
-        )
+        # Calculate metrics per antenna
+        antenna_precision_scores = []
+        antenna_recall_scores = []
+        antenna_f1_scores = []
+        
+        for antenna, values in grouped_metrics.items():
+            y_hat_group = torch.cat(values["y_hat"])
+            y_group = torch.cat(values["y"])
+            
+            precision = self.precision(y_hat_group, y_group)
+            recall = self.recall(y_hat_group, y_group)
+            f1 = self.f1_score(y_hat_group, y_group)
+            
+            antenna_precision_scores.append(precision)
+            antenna_recall_scores.append(recall)
+            antenna_f1_scores.append(f1)
+            
+            # Log metrics per antenna
+            self.log(f"test_precision_{antenna}", precision, prog_bar=False)
+            self.log(f"test_recall_{antenna}", recall, prog_bar=False)
+            self.log(f"test_f1_{antenna}", f1, prog_bar=False)
 
-        plt.close(fig)
-
-        # Reset confusion matrix for the next epoch
-        self.confmat.reset()
+        # Log averaged metrics across antennas
+        avg_precision = torch.mean(torch.tensor(antenna_precision_scores))
+        avg_recall = torch.mean(torch.tensor(antenna_recall_scores))
+        avg_f1 = torch.mean(torch.tensor(antenna_f1_scores))
+        
+        self.log("test_avg_precision", avg_precision, prog_bar=True)
+        self.log("test_avg_recall", avg_recall, prog_bar=True)
+        self.log("test_avg_f1", avg_f1, prog_bar=True)
 
     def on_train_end(self):
-        # Log the best model to wandb at the end of training
-        best_model_path = self.trainer.checkpoint_callback.best_model_path
-        if best_model_path:
-            wandb.log_artifact(best_model_path, type="model", name="best_model")
+        # Check if the run is not part of a sweep
+        if wandb.run.sweep_id is None and not self.trainer.sanity_checking:
+            # Save the model manually
+            model_path = "final_model.pth"
+            torch.save(self.state_dict(), model_path)
+            
+            # Log the saved model to wandb
+            artifact = wandb.Artifact("final_model", type="model")
+            artifact.add_file(model_path)
+            wandb.log_artifact(artifact)
+
+
 
     def configure_optimizers(self):
-        return OPTIMIZERS[self.optimizer_name](
+        # Initialize optimizer
+        optimizer = OPTIMIZERS[self.optimizer_name](
             params=self.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
         )
+        
+        # Initialize scheduler
+        scheduler = LinearLR(
+            optimizer,
+            start_factor=1.0,  # Starting factor for LR (1.0 = initial LR)
+            end_factor=0.0,    # Final factor for LR (0.0 = fully decay to 0)
+            total_iters=self.max_epochs  # Total epochs for decay
+        )
+        
+        # Return optimizer and scheduler
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "epoch",  # Step every epoch
+                "frequency": 1,      # Frequency of stepping
+            },
+        }
 
 
 class GrayScaleResNet(EcallistoBase):
@@ -240,6 +258,7 @@ class GrayScaleResNet(EcallistoBase):
         resnet_type,
         optimizer_name,
         learning_rate,
+        max_epochs,
         weight_decay=None,
         label_smoothing=None,
         class_weights=None,
@@ -252,6 +271,7 @@ class GrayScaleResNet(EcallistoBase):
             batch_size=batch_size,
             optimizer_name=optimizer_name,
             learning_rate=learning_rate,
+            max_epochs=max_epochs,
             weight_decay=weight_decay,
             label_smoothing=label_smoothing,
         )
@@ -271,5 +291,5 @@ class GrayScaleResNet(EcallistoBase):
 if __name__ == "__main__":
     x = torch.load("img.torch")
     print(x.shape)
-    model = GrayScaleResNet(2, "resnet18", "adam", 1)
+    model = GrayScaleResNet(2, "resnet18", "adam", 1, 5)
     print(model(x.unsqueeze(0)))

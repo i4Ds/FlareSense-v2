@@ -176,7 +176,7 @@ if __name__ == "__main__":
         persistent_workers=True,
     )
 
-    # Checkpoint to save the best model based on the lowest validation loss
+    """    # Checkpoint to save the best model based on the lowest validation loss
     checkpoint_callback_f1 = ModelCheckpoint(
         monitor="val_f1",
         dirpath=wandb_logger.experiment.dir,
@@ -193,6 +193,7 @@ if __name__ == "__main__":
         mode="min",
         min_delta=0.001,
     )
+    """
 
     # Setup Model
     cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
@@ -214,7 +215,7 @@ if __name__ == "__main__":
         logger=wandb_logger,
         enable_progress_bar=False,
         val_check_interval=1.0,  # Every Epoch.
-        callbacks=[checkpoint_callback_f1, early_stopping_callback],
+        # callbacks=[checkpoint_callback_f1, early_stopping_callback],
     )
 
     # Train
@@ -246,4 +247,4 @@ if __name__ == "__main__":
         shuffle=False,
         persistent_workers=False,
     )
-    trainer.test(model, test_dataloader, ckpt_path="best")
+    trainer.test(model, test_dataloader)
