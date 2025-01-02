@@ -14,6 +14,8 @@ RESNET_DICT = {
     "resnet18": models.resnet18,
     "resnet34": models.resnet34,
     "resnet50": models.resnet50,
+    "resnet101": models.resnet101,
+    "resnet152": models.resnet152,
 }
 
 OPTIMIZERS = {
@@ -242,6 +244,10 @@ class EcallistoBase(LightningModule):
             wandb.log_artifact(artifact)
 
     def configure_optimizers(self):
+        if self.warmup_epochs >= self.max_epochs:
+            raise ValueError(
+                "Warm-up epochs should be less than the total number of epochs."
+            )
         # Initialize optimizer
         optimizer = OPTIMIZERS[self.optimizer_name](
             params=self.parameters(),
