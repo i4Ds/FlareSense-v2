@@ -103,8 +103,8 @@ if __name__ == "__main__":
 
     current_date = datetime.now()
     current_year = str(current_date.year)
-    current_month = str(current_date.month)
-    current_day = str(current_date.day)
+    current_month = f"{current_date.month:02d}"
+    current_day = f"{current_date.day:02d}"
 
     with gr.Blocks(title="FlareSense Burst Detection") as demo:
         gr.Markdown(
