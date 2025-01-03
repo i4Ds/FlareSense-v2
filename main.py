@@ -6,7 +6,6 @@ import torch
 import yaml
 from datasets import load_dataset, concatenate_datasets
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision.transforms import Compose
@@ -23,6 +22,7 @@ from ecallisto_dataset import (
     clip_tensor,
 )
 from ecallisto_model import GrayScaleResNet
+from pytorch_lightning.callbacks import LearningRateMonitor
 
 if __name__ == "__main__":
     print(f"PyTorch version {torch.__version__}")
@@ -60,6 +60,7 @@ if __name__ == "__main__":
             _stats_disk_paths=("/mnt/nas05/data01/vincenzo/", "/"),
         ),
     ),
+
     wandb_logger = WandbLogger(log_model=False)  # Push it only on training end.
 
     # Overwrite config with wandb config (for sweep etc.)
@@ -162,6 +163,7 @@ if __name__ == "__main__":
         sampler=sampler,
         batch_size=config["general"]["batch_size"],
         num_workers=8,
+        prefetch_factor=6,
         pin_memory=True,
         shuffle=False if sampler is not None else True,
         persistent_workers=True,
@@ -171,27 +173,13 @@ if __name__ == "__main__":
         ds_valid,
         batch_size=config["general"]["batch_size"],
         num_workers=8,
+        prefetch_factor=6,
         pin_memory=True,
         shuffle=False,
         persistent_workers=True,
     )
 
-    # Checkpoint to save the best model based on the lowest validation loss
-    checkpoint_callback_f1 = ModelCheckpoint(
-        monitor="val_f1",
-        dirpath=wandb_logger.experiment.dir,
-        filename="f1-{epoch:02d}-{step:05d}-{val_f1:.3f}",
-        save_top_k=1,
-        mode="max",
-    )
-
-    # Early stopping based on validation loss
-    early_stopping_callback = EarlyStopping(
-        monitor="val_loss",
-        patience=3,  # It's 3 Epochs.
-        verbose=True,
-        mode="min",
-    )
+    lr_monitor = LearningRateMonitor(logging_interval="epoch")
 
     # Setup Model
     cw = torch.tensor(ds_train.get_class_weights(), dtype=torch.float)
@@ -201,6 +189,8 @@ if __name__ == "__main__":
         class_weights=(cw if config["general"]["use_class_weights"] else None),
         batch_size=config["general"]["batch_size"],
         optimizer_name=config["model"]["optimizer_name"],
+        max_epochs=config["general"]["max_epochs"],
+        warmup_epochs=config["model"]["warmup_epochs"],
         learning_rate=config["model"]["lr"],
         weight_decay=config["model"]["weight_decay"],
         label_smoothing=config["model"]["label_smoothing"],
@@ -213,7 +203,8 @@ if __name__ == "__main__":
         logger=wandb_logger,
         enable_progress_bar=False,
         val_check_interval=1.0,  # Every Epoch.
-        callbacks=[checkpoint_callback_f1, early_stopping_callback],
+        # callbacks=[checkpoint_callback_f1, early_stopping_callback],
+        callbacks=[lr_monitor],
     )
 
     # Train
@@ -245,4 +236,4 @@ if __name__ == "__main__":
         shuffle=False,
         persistent_workers=False,
     )
-    trainer.test(model, test_dataloader, ckpt_path="best")
+    trainer.test(model, test_dataloader)
