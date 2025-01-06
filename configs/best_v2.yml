@@ -10,9 +10,9 @@ model:
   input_size: [128, 512]
   optimizer_name: adamw
   warmup_epochs: 12
-  lr: 0.0002376
-  label_smoothing: 0.117395659
-  weight_decay: 0.000516499
+  lr: 0.00023762695665743765
+  label_smoothing: 0.11739565855800864
+  weight_decay: 0.0005164989055101516
 
 data:
   train_path: [i4ds/ecallisto_radio_sunburst, i4ds/ecallisto_radio_sunburst]
