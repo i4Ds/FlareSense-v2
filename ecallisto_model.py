@@ -205,9 +205,15 @@ class EcallistoBase(LightningModule):
         antenna_recall_scores = []
         antenna_f1_scores = []
 
+        # Save also predictions
+        y_hat = []
+        y = []
+
         for antenna, values in grouped_metrics.items():
             y_hat_group = torch.cat(values["y_hat"])
             y_group = torch.cat(values["y"])
+            y_hat.append(y_hat_group)
+            y.append(y_group)
 
             precision = self.precision(y_hat_group, y_group)
             recall = self.recall(y_hat_group, y_group)
@@ -230,6 +236,11 @@ class EcallistoBase(LightningModule):
         self.log("test_avg_precision", avg_precision, prog_bar=True)
         self.log("test_avg_recall", avg_recall, prog_bar=True)
         self.log("test_avg_f1", avg_f1, prog_bar=True)
+
+        # Also add the weighted f1, precision, and recall
+        self.log("test_f1", self.f1_score(torch.cat(y), torch.cat(y_hat)))
+        self.log("test_precision", self.precision(torch.cat(y), torch.cat(y_hat)))
+        self.log("test_recall", self.recall(torch.cat(y), torch.cat(y_hat)))
 
     def on_train_end(self):
         # Check if the run is not part of a sweep

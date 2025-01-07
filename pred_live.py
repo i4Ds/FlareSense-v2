@@ -12,7 +12,12 @@ from ecallisto_ng.data_download.hu_dataset import (
     load_radio_dataset,
 )
 
-from ecallisto_dataset import EcallistoDatasetBinary, custom_resize, remove_background
+from ecallisto_dataset import (
+    EcallistoDatasetBinary,
+    custom_resize,
+    remove_background,
+    normal_resize,
+)
 from ecallisto_model import GrayScaleResNet
 from ecallisto_ng.plotting.plotting import plot_spectrogram
 from ecallisto_ng.data_processing.utils import subtract_constant_background
@@ -29,40 +34,48 @@ CONFIG_PATH = "configs/relabeled_data_best.yml"
 T = 1.006  # Temperature parameter
 torch.set_float32_matmul_precision("high")
 
+
 # Parameters
 INSTRUMENT_LIST = [
+    "ALASKA-ANCHORAGE_91",
+    "ALASKA-COHOE_63",
+    "ALASKA-HAARP_62",
+    "ALGERIA-CRAAG_59",
     "ALMATY_59",
+    "AUSTRIA-UNIGRAZ_01",
     "Australia-ASSA_57",
     "Australia-ASSA_63",
-    "AUSTRIA-UNIGRAZ_01",
-    "EGYPT-SpaceAgency_01",
+    "BIR_01",
     "EGYPT-Alexandria_02",
+    "EGYPT-SpaceAgency_01",
     "GERMANY-DLR_63",
+    "GLASGOW_01",
+    "GREENLAND_62",
+    "GREENLAND_62",
     "HUMAIN_59",
+    "HURBANOVO_59",
     "INDIA-GAURI_59",
+    "INDIA-OOTY_02",
     "INDIA-UDAIPUR_03",
+    "INDONESIA_59",
+    "ITALY-Strassolt_01",
+    "KASI_59",
     "MEXART_59",
-    "MEXICO-LANCE-B_62",
     "MEXICO-FCFM-UNACH_62",
+    "MEXICO-LANCE-B_62",
+    "MONGOLIA-UB_01",
+    "MRO_59",
+    "MRO_61",
+    "Malaysia-Banting_01",
     "NORWAY-EGERSUND_01",
     "ROMANIA_01",
     "ROSWELL-NM_59",
+    "SRI-Lanka_59",
     "SSRT_59",
-    "TRIEST_57",
-    "ALASKA-HAARP_62",
-    "KASI_59",
-    "Malaysia-Banting_01",
-    "MONGOLIA-UB_01",
-    "UZBEKISTAN_01",
-    "INDONESIA_59",
-    "ITALY-Strassolt_01",
-    "MONGOLIA-UB_01",
     "SWISS-IRSOL_01",
     "SWISS-Landschlacht_62",
-    "HURBANOVO_59",
-    "GLASGOW_01",
-    "GREENLAND_62",
-    "SRI-Lanka_59",
+    "TRIEST_57",
+    "UZBEKISTAN_01",
 ]
 
 
@@ -99,8 +112,10 @@ def load_model(checkpoint_path: str, config_path: str):
         n_classes=1,
         resnet_type=config["model"]["model_type"],
         optimizer_name="adam",
-        learning_rate=1000,
-        label_smoothing=0.0,
+        learning_rate=1000, # Dummy value
+        label_smoothing=0.0, # Dummy value
+        max_epochs=1000, # Dummy value
+        warmup_epochs=10, # Dummy value
     )
     checkpoint = torch.load(
         checkpoint_path,
@@ -113,9 +128,18 @@ def load_model(checkpoint_path: str, config_path: str):
 
 def prepare_ecallisto_datasets(ds, config: dict):
     """Prepare EcallistoDatasetBinary with resizing and normalization."""
-    resize_func = Compose(
-        [lambda x: custom_resize(x, tuple(config["model"]["input_size"]))]
-    )
+    if config["data"]["custom_resize"]:
+        resize_func = Compose(
+            [
+                lambda x: custom_resize(x, tuple(config["model"]["input_size"])),
+            ]
+        )
+    else:
+        resize_func = Compose(
+            [
+                lambda x: normal_resize(x, tuple(config["model"]["input_size"])),
+            ]
+        )
     ds = ds.add_column("dummy_label", [0] * len(ds))
     edb = EcallistoDatasetBinary(
         ds,
