@@ -28,9 +28,9 @@ import shutil
 import time
 
 # Model Parameters
-REPO_ID = "i4ds/flaresense"
+REPO_ID = "i4ds/flaresense-v2"
 MODEL_FILENAME = "model.ckpt"
-CONFIG_PATH = "configs/relabeled_data_best.yml"
+CONFIG_PATH = "configs/best_v2.yml"
 T = 1.006  # Temperature parameter
 torch.set_float32_matmul_precision("high")
 
@@ -160,7 +160,9 @@ def prepare_dataloaders(ds: EcallistoDatasetBinary, batch_size: int):
     )
 
 
-def predict_from_to(start_datetime, end_datetime, model, config):
+def predict_from_to(start_datetime, end_datetime, model, config, base_path=None):
+    if base_path is None:
+        base_path = BASE_PATH
     # Temporary directory for parquet data
     tmp_dir = tempfile.mkdtemp()
 
@@ -214,7 +216,7 @@ def predict_from_to(start_datetime, end_datetime, model, config):
             year = row["datetime"].year
             month = f'{row["datetime"].month:02d}'
             day = f'{row["datetime"].day:02d}'
-            out_dir = f'{BASE_PATH}/{year}/{month}/{day}/{row["antenna"]}'
+            out_dir = f'{base_path}/{year}/{month}/{day}/{row["antenna"]}'
             out_name = f'{row["proba"]*100:.2f}_{row["antenna"]}_{row["datetime"].strftime("%d-%m-%Y_%H-%M-%S")}.png'
             out_path = os.path.join(out_dir, out_name)
 

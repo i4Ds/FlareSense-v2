@@ -1,37 +1,21 @@
 import torch
-import yaml
+
 import os
 from datetime import datetime, timedelta, timezone
-from torch.utils.data import DataLoader
-from torchvision.transforms import Compose
-from tqdm import tqdm
+
 from huggingface_hub import hf_hub_download
 
-from ecallisto_ng.data_download.hu_dataset import (
-    create_overlapping_parquets,
-    load_radio_dataset,
-)
 
-from ecallisto_dataset import EcallistoDatasetBinary, custom_resize, remove_background
-from ecallisto_model import GrayScaleResNet
-from ecallisto_ng.plotting.plotting import plot_spectrogram
-from ecallisto_ng.data_processing.utils import subtract_constant_background
-from ecallisto_ng.data_download.downloader import get_ecallisto_data
-from pred_live import (
-    create_logits,
-    load_model,
-    prepare_ecallisto_datasets,
-    prepare_dataloaders,
-    predict_from_to,
-)
-import tempfile
-import shutil
 import pandas as pd
+from pred_live import (
+    predict_from_to,
+    load_model,
+)
 
 # Model Parameters
-REPO_ID = "i4ds/flaresense"
+REPO_ID = "i4ds/flaresense-v2"
 MODEL_FILENAME = "model.ckpt"
-CONFIG_PATH = "configs/relabeled_data_best.yml"
+CONFIG_PATH = "configs/best_v2.yml"
 T = 1.006  # Temperature parameter
 torch.set_float32_matmul_precision("high")
 
@@ -86,12 +70,12 @@ if __name__ == "__main__":
     model.to(device)
 
     # Predict between two ranges
-    start_datetime = datetime(2024, 12, 18, 0, 0, 0, tzinfo=timezone.utc)
-    end_datetime = datetime(2024, 12, 18, 22, 0, 0, tzinfo=timezone.utc)
+    start_datetime = datetime(2024, 12, 15, 0, 0, 0, tzinfo=timezone.utc)
+    end_datetime = datetime(2024, 12, 15, 22, 0, 0, tzinfo=timezone.utc)
 
     # Split it up into two-hour steps
     for start_time in pd.date_range(
         start_datetime, end_datetime, freq="2h", inclusive="both"
     ):
         end_time = start_time + timedelta(hours=2)
-        predict_from_to(start_time, end_time, model, config)
+        predict_from_to(start_time, end_time, model, config, "burst_plots")

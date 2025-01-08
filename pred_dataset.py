@@ -2,34 +2,36 @@ import torch
 
 from datasets import load_dataset
 
-
-import wandb
-
 from pred_live import (
-    create_logits,
     load_model,
+    create_logits,
     prepare_ecallisto_datasets,
     prepare_dataloaders,
 )
+from huggingface_hub import hf_hub_download
+
+REPO_ID = "i4ds/flaresense-v2"
+MODEL_FILENAME = "model.ckpt"
+CONFIG_PATH = "configs/best_v2.yml"
 
 
-def main(checkpoint_reference, config):
+def main(config):
     # Setup WandB API and download the artifact
-    api = wandb.Api()
-    artifact = api.artifact(checkpoint_reference)
-    _ = artifact.download()
-
+    checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
     # Device configuration
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load model and configuration
-    print(artifact.file())
-    model, config = load_model(artifact.file(), config)
+    model, config = load_model(checkpoint_path, config)
 
     print("model loaded")
 
     # Prepare datasets and dataloaders
-    ds = load_dataset(config["data"]["pred_path"], split=config["data"]["pred_split"])
+    ds = load_dataset(
+        config["data"]["pred_path"],
+        split=config["data"]["pred_split"],
+        cache_dir="/mnt/nas05/data01/vincenzo/hu",
+    )
 
     # Create ecallisto dataset and dataloader
     edb = prepare_ecallisto_datasets(ds, config)
@@ -48,4 +50,4 @@ def main(checkpoint_reference, config):
 
 
 if __name__ == "__main__":
-    main("vincenzo-timmel/FlareSense-v2/final_model:v7", "configs/best_v2.yml")
+    main("configs/best_v2.yml")
