@@ -18,8 +18,6 @@ CONFIG_PATH = "configs/best_v2.yml"
 def main(config):
     # Setup WandB API and download the artifact
     checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
-    # Device configuration
-    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load model and configuration
     model, config = load_model(checkpoint_path, config)
@@ -40,10 +38,10 @@ def main(config):
     dataloader = prepare_dataloaders(edb, config["general"]["batch_size"])
 
     # Predict probabilities
-    preds = create_logits(model, dataloader, device)
+    preds = create_logits(model, dataloader)
 
     # Save a dataframe with the predictions
-    ds = ds.select_columns(["datetime", "antenna"])
+    ds = ds.select_columns(["start_datetime", "antenna"])
     df = ds.to_pandas()
     df["pred"] = preds
     df.to_csv(f"{config['data']['pred_path'].split('/')[1]}_test.csv")

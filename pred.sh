@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --time=24:00:00
+#SBATCH --time=08:00:00
 #SBATCH --ntasks-per-node=1
 #SBATCH --job-name flaresense-pred
 #SBATCH --mem=64G
@@ -8,4 +8,8 @@
 #SBATCH --out=logs/%j.out
 #SBATCH --error=logs/%j.err
 
-python pred_range.py
+export HF_HOME=/tmp/vincenzo/huggingface
+export TRANSFORMERS_CACHE=/tmp/vincenzo/huggingface/transformers
+export HF_DATASETS_CACHE=/tmp/vincenzo/huggingface/datasets
+
+python pred_dataset.py
