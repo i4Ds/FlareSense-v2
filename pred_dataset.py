@@ -41,7 +41,10 @@ def main(config):
     preds = create_logits(model, dataloader)
 
     # Save a dataframe with the predictions
-    ds = ds.select_columns(["start_datetime", "antenna"])
+    if "manual_label" in ds.column_names:
+        ds = ds.select_columns(["manual_label", "start_datetime", "antenna"])
+    else:
+        ds = ds.select_columns(["start_datetime", "antenna"])
     df = ds.to_pandas()
     df["pred"] = preds
     df.to_csv(f"{config['data']['pred_path'].split('/')[1]}_test.csv")
