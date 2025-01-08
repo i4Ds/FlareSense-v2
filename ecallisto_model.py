@@ -238,9 +238,9 @@ class EcallistoBase(LightningModule):
         self.log("test_avg_f1", avg_f1, prog_bar=True)
 
         # Also add the weighted f1, precision, and recall
-        self.log("test_f1", self.f1_score(torch.cat(y), torch.cat(y_hat)))
-        self.log("test_precision", self.precision(torch.cat(y), torch.cat(y_hat)))
-        self.log("test_recall", self.recall(torch.cat(y), torch.cat(y_hat)))
+        self.log("test_f1", self.f1_score(torch.cat(y_hat), torch.cat(y)))
+        self.log("test_precision", self.precision(torch.cat(y_hat), torch.cat(y)))
+        self.log("test_recall", self.recall(torch.cat(y_hat), torch.cat(y)))
 
     def on_train_end(self):
         # Check if the run is not part of a sweep

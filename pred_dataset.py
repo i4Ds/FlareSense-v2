@@ -1,70 +1,16 @@
-import pandas as pd
 import torch
-import yaml
-from datasets import DatasetDict, load_dataset
-from torch.utils.data import DataLoader
-from torchvision.transforms import Compose
-from tqdm import tqdm
+
+from datasets import load_dataset
+
 
 import wandb
-from ecallisto_dataset import EcallistoDatasetBinary, custom_resize, remove_background
-from ecallisto_model import GrayScaleResNet
 
-
-def create_logits(model: GrayScaleResNet, dataloader, device):
-    model.eval()  # Ensure the model is in evaluation mode
-    model.to(device)  # Send the model to the appropriate device
-    binary_logits = []
-
-    print("Starting prediction")
-    with torch.no_grad():
-        for inputs, _, _, _ in tqdm(dataloader):
-            y_hat = model(inputs.to(device)).squeeze(dim=1)
-            binary_logits.extend(y_hat.cpu().tolist())
-
-    return binary_logits
-
-
-def load_model(checkpoint_path, config_path):
-    # Load configuration
-    with open(config_path, "r") as file:
-        config = yaml.safe_load(file)
-    # Initialize the model
-    model = GrayScaleResNet(
-        1,
-        resnet_type=config["model"]["model_type"],
-        optimizer_name="adam",
-        learning_rate=1000,
-        label_smoothing=0.0,
-    )
-
-    # Load checkpoint
-    checkpoint = torch.load(checkpoint_path)
-    model.load_state_dict(checkpoint["state_dict"])
-
-    return model, config
-
-
-def prepare_ecallisto_datasets(ds, config):
-    resize_func = Compose(
-        [lambda x: custom_resize(x, tuple(config["model"]["input_size"]))]
-    )
-    print("Wohoho")
-    ds = ds.add_column("dummy_label", [0] * len(ds))
-    edb = EcallistoDatasetBinary(
-        ds,
-        label_name="dummy_label",
-        resize_func=resize_func,
-        normalization_transform=remove_background,
-    )
-    return edb
-
-
-def prepare_dataloaders(ds, batch_size):
-    dataloader = DataLoader(
-        ds, batch_size=batch_size, shuffle=False, persistent_workers=False
-    )
-    return dataloader
+from pred_live import (
+    create_logits,
+    load_model,
+    prepare_ecallisto_datasets,
+    prepare_dataloaders,
+)
 
 
 def main(checkpoint_reference, config):

@@ -112,17 +112,20 @@ def load_model(checkpoint_path: str, config_path: str):
         n_classes=1,
         resnet_type=config["model"]["model_type"],
         optimizer_name="adam",
-        learning_rate=1000, # Dummy value
-        label_smoothing=0.0, # Dummy value
-        max_epochs=1000, # Dummy value
-        warmup_epochs=10, # Dummy value
+        learning_rate=1000,  # Dummy value
+        label_smoothing=0.0,  # Dummy value
+        max_epochs=1000,  # Dummy value
+        warmup_epochs=10,  # Dummy value
     )
     checkpoint = torch.load(
         checkpoint_path,
         weights_only=True,
         map_location="cuda" if torch.cuda.is_available() else "cpu",
     )
-    model.load_state_dict(checkpoint["state_dict"])
+    if "state_dict" in checkpoint:
+        model.load_state_dict(checkpoint["state_dict"])
+    else:
+        model.load_state_dict(checkpoint)
     return model, config
 
 
