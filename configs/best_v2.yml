@@ -38,6 +38,6 @@ data:
   freq_mask_method: random
   time_warp_w: 389
   pred_path: i4ds/ecallisto_radio_sunburst
-  pred_split: test
+  pred_split: train
 
 # https://wandb.ai/vincenzo-timmel/FlareSense-v2/runs/dfpxq6wo/overview

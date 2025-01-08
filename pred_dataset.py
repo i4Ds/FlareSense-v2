@@ -47,7 +47,9 @@ def main(config):
         ds = ds.select_columns(["start_datetime", "antenna"])
     df = ds.to_pandas()
     df["pred"] = preds
-    df.to_csv(f"{config['data']['pred_path'].split('/')[1]}_test.csv")
+    df.to_csv(
+        f"{config['data']['pred_path'].split('/')[1]}_{config['data']['pred_split']}.csv"
+    )
 
 
 if __name__ == "__main__":
