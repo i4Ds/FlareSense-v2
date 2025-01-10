@@ -31,7 +31,7 @@ import time
 REPO_ID = "i4ds/flaresense-v2"
 MODEL_FILENAME = "model.ckpt"
 CONFIG_PATH = "configs/best_v2.yml"
-T = 1.006  # Temperature parameter
+T = 0.4974  # Temperature parameter
 torch.set_float32_matmul_precision("high")
 
 

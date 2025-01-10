@@ -139,7 +139,7 @@ if __name__ == "__main__":
             min_proba = gr.Slider(
                 minimum=50.0,
                 maximum=100.0,
-                value=70.0,
+                value=50.0,
                 label="Minimum Probability",
                 info="Filter by minimum probability",
             )
@@ -147,7 +147,7 @@ if __name__ == "__main__":
                 minimum=1,
                 maximum=5,
                 step=1,
-                value=2,
+                value=3,
                 label="Minimum Number of Stations (k)",
                 info="At least k stations must have detected the burst",
             )
