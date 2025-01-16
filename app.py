@@ -60,7 +60,7 @@ def download_csv(year, month, day, sort_by, min_proba, k) -> str:
     return csv_path
 
 
-def plot_bursts(min_proba, k, days=30):
+def plot_bursts(min_proba=0.5, k=3, days=30):
     dfs = []
     for i in range(days):
         d = datetime.now() - timedelta(days=i)
@@ -82,7 +82,7 @@ def plot_bursts(min_proba, k, days=30):
         daily_counts,
         x="Day",
         y="Count",
-        title="Number of Bursts per Day (Last 14 Days)",
+        title=f"Number of Bursts per Day (Last {days} Days)",
         labels={"Day": "Date", "Count": "Bursts"},
     )
 
@@ -170,6 +170,14 @@ def create_demo():
             """
         )
 
+        # Bar Plot
+        line_plot = gr.Plot()
+        demo.load(
+            fn=plot_bursts,
+            inputs=None,
+            outputs=line_plot,
+        )
+
         with gr.Row():
             year = gr.Dropdown(choices=years, label="Year")
             month = gr.Dropdown(choices=months, label="Month")
@@ -195,15 +203,8 @@ def create_demo():
                 label="Minimum Number of Stations (k)",
                 info="At least k stations must have detected the burst",
             )
-
         load_btn = gr.Button("Load Images")
-        # Show the line plot below the load images parameters when the app is opened
-        line_plot = gr.Plot()
-        demo.load(
-            fn=plot_bursts,
-            inputs=[min_proba, k_stations],
-            outputs=line_plot,
-        )
+
         gallery = gr.Gallery(
             object_fit="fill", elem_id="gallery", columns=[3], rows=[1], height="auto"
         )
