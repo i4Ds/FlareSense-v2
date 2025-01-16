@@ -6,6 +6,7 @@ import tempfile
 import pandas as pd
 from typing import List, Tuple
 import plotly.express as px
+import plotly.graph_objects as go
 
 
 BASE_PATH = os.path.join("/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images")
@@ -60,12 +61,11 @@ def download_csv(year, month, day, sort_by, min_proba, k) -> str:
     return csv_path
 
 
-def plot_bursts(min_proba=0.5, k=3, days=30):
+def plot_bursts(min_proba, k, days=30):
     dfs = []
     for i in range(days):
         d = datetime.now() - timedelta(days=i)
         y, m, da = str(d.year), f"{d.month:02d}", f"{d.day:02d}"
-        _, df = load_images_and_table(y, m, da, "Datetime", min_proba, k)
         df = load_image_paths(y, m, da, min_proba)
         dfs.append(df)
 
@@ -73,27 +73,48 @@ def plot_bursts(min_proba=0.5, k=3, days=30):
         return {}
 
     all_data = pd.concat(dfs, ignore_index=True)
-    # Group by day instead of hour
+    all_data = pd.concat(dfs, ignore_index=True)
     all_data["Day"] = all_data["Datetime"].dt.floor("D")
-    daily_counts = all_data.groupby("Day").size().reset_index(name="Count")
+    # Calculate total daily counts
+    daily_counts = all_data.groupby("Day").size().reset_index(name="Total Count")
+    daily_counts["7-Day MA"] = daily_counts["Total Count"].rolling(window=7).mean()
 
-    # Create a bar plot
-    fig = px.bar(
-        daily_counts,
-        x="Day",
-        y="Count",
-        title=f"Number of Bursts per Day (Last {days} Days)",
-        labels={"Day": "Date", "Count": "Bursts"},
+    # Group by day and station, count
+    daily_by_station = (
+        all_data.groupby(["Day", "Instrument Location"])
+        .size()
+        .reset_index(name="Count")
+        .sort_values(by="Count", ascending=False)
     )
 
-    # Make it look nicer
-    fig.update_traces(marker_color="royalblue")
+    # Stacked bar plot
+    fig = px.bar(
+        daily_by_station,
+        x="Day",
+        y="Count",
+        color="Instrument Location",
+        barmode="stack",
+        title=f"Number of Bursts per Day by Station (Last {days} Days)",
+        labels={"Day": "Date", "Count": "Bursts"},
+    )
+    # Add moving average line to the plot
+    fig.add_scatter(
+        x=daily_counts["Day"],
+        y=daily_counts["7-Day MA"],
+        mode="lines",
+        line=dict(color="red", width=2),
+        name="7-Day Moving Average",
+    )
+
     fig.update_layout(
-        plot_bgcolor="white",
+        hovermode="closest",
         xaxis_title="Date",
         yaxis_title="Bursts Detected",
         font=dict(size=14),
     )
+    # Show only hovered bar info
+    fig.update_traces(hovertemplate="Date: %{x}<br>Bursts: %{y}")
+
     return fig
 
 
