@@ -1,12 +1,16 @@
 import gradio as gr
 import glob, os
-from datetime import datetime
+from datetime import datetime, timedelta
 import os, glob
 import tempfile
 import pandas as pd
 from typing import List, Tuple
+import plotly.express as px
+
 
 BASE_PATH = os.path.join("/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images")
+
+from pred_live import INSTRUMENT_LIST
 
 
 def load_images(table, sort_by) -> List:
@@ -56,6 +60,43 @@ def download_csv(year, month, day, sort_by, min_proba, k) -> str:
     return csv_path
 
 
+def plot_bursts(min_proba, k, days=30):
+    dfs = []
+    for i in range(days):
+        d = datetime.now() - timedelta(days=i)
+        y, m, da = str(d.year), f"{d.month:02d}", f"{d.day:02d}"
+        _, df = load_images_and_table(y, m, da, "Datetime", min_proba, k)
+        df = load_image_paths(y, m, da, min_proba)
+        dfs.append(df)
+
+    if not dfs:
+        return {}
+
+    all_data = pd.concat(dfs, ignore_index=True)
+    # Group by day instead of hour
+    all_data["Day"] = all_data["Datetime"].dt.floor("D")
+    daily_counts = all_data.groupby("Day").size().reset_index(name="Count")
+
+    # Create a bar plot
+    fig = px.bar(
+        daily_counts,
+        x="Day",
+        y="Count",
+        title="Number of Bursts per Day (Last 14 Days)",
+        labels={"Day": "Date", "Count": "Bursts"},
+    )
+
+    # Make it look nicer
+    fig.update_traces(marker_color="royalblue")
+    fig.update_layout(
+        plot_bgcolor="white",
+        xaxis_title="Date",
+        yaxis_title="Bursts Detected",
+        font=dict(size=14),
+    )
+    return fig
+
+
 def load_images_and_table(
     year, month, day, sort_by, min_proba, k
 ) -> Tuple[List, pd.DataFrame]:
@@ -93,18 +134,18 @@ def load_images_and_table(
     return img_data, filtered_table.round(2)
 
 
-if __name__ == "__main__":
-    # Glob folder structure
-    from pred_live import INSTRUMENT_LIST
+def get_current_date():
+    current_datetime = datetime.now()
+    current_year = str(current_datetime.year)
+    current_month = f"{current_datetime.month:02d}"
+    current_day = f"{current_datetime.day:02d}"
+    return current_year, current_month, current_day
 
+
+def create_demo():
     years = ["2025", "2024"]
     months = [f"{m:02d}" for m in range(1, 13)]
     days = [f"{d:02d}" for d in range(1, 32)]
-
-    current_date = datetime.now()
-    current_year = str(current_date.year)
-    current_month = f"{current_date.month:02d}"
-    current_day = f"{current_date.day:02d}"
 
     with gr.Blocks(title="FlareSense Burst Detection") as demo:
         gr.Markdown(
@@ -115,7 +156,7 @@ if __name__ == "__main__":
 
             
             <b>A tool for detecting solar radio bursts on <a href="https://www.e-callisto.org/" target="_blank">E-callisto</a> Data.<br></b>
-            Select a date, sorting mode, probability threshold, and minimum number of stations. Click on an image to increase its size.<br>
+            Select a date, sorting mode, probability threshold, and minimum number of stations. Click on an image to increase its size. The Barplot is unaffected by the minimum Probability and minimum number of stations.<br>
 
             
             Predictions update every 2 hours, using data from:<br>
@@ -130,9 +171,12 @@ if __name__ == "__main__":
         )
 
         with gr.Row():
-            year = gr.Dropdown(choices=years, value=current_year, label="Year")
-            month = gr.Dropdown(choices=months, value=current_month, label="Month")
-            day = gr.Dropdown(choices=days, value=current_day, label="Day")
+            year = gr.Dropdown(choices=years, label="Year")
+            month = gr.Dropdown(choices=months, label="Month")
+            day = gr.Dropdown(choices=days, label="Day")
+
+            demo.load(get_current_date, inputs=None, outputs=[year, month, day])
+
             sort_by = gr.Dropdown(
                 choices=["Probability", "Time"], value="Probability", label="Sort By"
             )
@@ -153,6 +197,13 @@ if __name__ == "__main__":
             )
 
         load_btn = gr.Button("Load Images")
+        # Show the line plot below the load images parameters when the app is opened
+        line_plot = gr.Plot()
+        demo.load(
+            fn=plot_bursts,
+            inputs=[min_proba, k_stations],
+            outputs=line_plot,
+        )
         gallery = gr.Gallery(
             object_fit="fill", elem_id="gallery", columns=[3], rows=[1], height="auto"
         )
@@ -173,4 +224,9 @@ if __name__ == "__main__":
             outputs=download_file,
         )
 
+        return demo
+
+
+if __name__ == "__main__":
+    demo = create_demo()
     demo.launch(allowed_paths=[BASE_PATH])
