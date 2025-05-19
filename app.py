@@ -10,6 +10,8 @@ import plotly.graph_objects as go
 
 
 BASE_PATH = os.path.join("/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images")
+SORT_BY_COLUMN = "Datetime"
+MIN_PROBABILITY = 0.5
 
 from pred_live import INSTRUMENT_LIST
 
@@ -175,17 +177,16 @@ def create_demo():
             <h1 style="margin-top:0;">FlareSense by <a href="https://i4ds.ch/" target="_blank">i4ds@fhnw</a></h1>
             <p style="font-size:1.1em;">
 
-            
             <b>A tool for detecting solar radio bursts on <a href="https://www.e-callisto.org/" target="_blank">E-callisto</a> Data.<br></b>
-            Select a date, sorting mode, probability threshold, and minimum number of stations. Click on an image to increase its size. The Barplot is unaffected by the minimum Probability and minimum number of stations.<br>
+            Select a date, sorting mode and minimum number of stations. Click on an image to increase its size. The Barplot is unaffected by the minimum Probability and minimum number of stations.<br>
 
-            
             Predictions update every 2 hours, using data from:<br>
             <b>{", ".join(INSTRUMENT_LIST)}</b>.
             </p>
             <p style="font-size:0.9em;">
-            For more info, refer to our <a href="https://placeholder.link.to.paper" target="_blank">paper</a>.<br>
-            For questions or comments, contact <a href="mailto:vincenzo.timmel@fhnw.ch" target="_blank">vincenzo.timmel@fhnw.ch</a>.
+            For more information about the stations, refer to <a href="https://www.e-callisto.org/stations.html" target="_blank">E-Callisto Stations</a>.<br>
+            For questions or comments, contact <a href="mailto:vincenzo.timmel@fhnw.ch" target="_blank">vincenzo.timmel@fhnw.ch</a>.        
+            For more information about the project, refer to our <a href="https://placeholder.link.to.paper" target="_blank">paper</a>.<br>
             </p>
             </div>
             """
@@ -206,16 +207,10 @@ def create_demo():
 
             demo.load(get_current_date, inputs=None, outputs=[year, month, day])
 
-            sort_by = gr.Dropdown(
-                choices=["Probability", "Time"], value="Probability", label="Sort By"
-            )
-            min_proba = gr.Slider(
-                minimum=50.0,
-                maximum=100.0,
-                value=50.0,
-                label="Minimum Probability",
-                info="Filter by minimum probability",
-            )
+            # technically, can also be from a dropdown menu.
+            sort_by = SORT_BY_COLUMN
+            min_proba = MIN_PROBABILITY
+
             k_stations = gr.Slider(
                 minimum=1,
                 maximum=5,

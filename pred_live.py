@@ -51,7 +51,6 @@ INSTRUMENT_LIST = [
     "GERMANY-DLR_63",
     "GLASGOW_01",
     "GREENLAND_62",
-    "GREENLAND_62",
     "HUMAIN_59",
     "HURBANOVO_59",
     "INDIA-GAURI_59",
@@ -129,7 +128,7 @@ def load_model(checkpoint_path: str, config_path: str):
     return model, config
 
 
-def prepare_ecallisto_datasets(ds, config: dict):
+def prepare_ecallisto_datasets(ds, config: dict, live_mode: bool = False):
     """Prepare EcallistoDatasetBinary with resizing and normalization."""
     if config["data"]["custom_resize"]:
         resize_func = Compose(
@@ -143,10 +142,9 @@ def prepare_ecallisto_datasets(ds, config: dict):
                 lambda x: normal_resize(x, tuple(config["model"]["input_size"])),
             ]
         )
-    ds = ds.add_column("dummy_label", [0] * len(ds))
     edb = EcallistoDatasetBinary(
         ds,
-        label_name="dummy_label",
+        label_name="dummy_label" if live_mode else config["data"]["test_label_name"],
         resize_func=resize_func,
         normalization_transform=remove_background,
     )
@@ -182,7 +180,7 @@ def predict_from_to(start_datetime, end_datetime, model, config, base_path=None)
             raise ValueError("No data found in parquet files.")
 
         # Prepare dataset and dataloaders
-        ds_e = prepare_ecallisto_datasets(ds, config)
+        ds_e = prepare_ecallisto_datasets(ds, config, live_mode=True)
         print(f"Predicting on {len(ds_e)} samples.")
 
         data_loader = prepare_dataloaders(ds_e, batch_size=8)

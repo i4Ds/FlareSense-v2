@@ -7,16 +7,9 @@ from huggingface_hub import hf_hub_download
 
 
 import pandas as pd
-from pred_live import (
-    predict_from_to,
-    load_model,
-)
+from pred_live import predict_from_to, load_model, REPO_ID, MODEL_FILENAME, CONFIG_PATH
 
 # Model Parameters
-REPO_ID = "i4ds/flaresense-v2"
-MODEL_FILENAME = "model.ckpt"
-CONFIG_PATH = "configs/best_v2.yml"
-T = 1.006  # Temperature parameter
 torch.set_float32_matmul_precision("high")
 
 # Parameters
@@ -70,8 +63,8 @@ if __name__ == "__main__":
     model.to(device)
 
     # Predict between two ranges
-    start_datetime = datetime(2024, 12, 15, 0, 0, 0, tzinfo=timezone.utc)
-    end_datetime = datetime(2024, 12, 15, 22, 0, 0, tzinfo=timezone.utc)
+    start_datetime = datetime(2025, 4, 24, 0, 0, 0, tzinfo=timezone.utc)
+    end_datetime = datetime(2025, 5, 19, 22, 0, 0, tzinfo=timezone.utc)
 
     # Split it up into two-hour steps
     for start_time in pd.date_range(
