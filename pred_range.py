@@ -7,7 +7,14 @@ from huggingface_hub import hf_hub_download
 
 
 import pandas as pd
-from pred_live import predict_from_to, load_model, REPO_ID, MODEL_FILENAME, CONFIG_PATH
+from pred_live import (
+    predict_from_to,
+    load_model,
+    REPO_ID,
+    MODEL_FILENAME,
+    CONFIG_PATH,
+)
+from app import BASE_PATH
 
 # Model Parameters
 torch.set_float32_matmul_precision("high")
@@ -43,8 +50,6 @@ INSTRUMENT_LIST = [
 ]
 
 if __name__ == "__main__":
-    BASE_PATH = "output_burst_images"
-
     if not os.path.exists(BASE_PATH):
         os.makedirs(BASE_PATH)
 
@@ -63,12 +68,12 @@ if __name__ == "__main__":
     model.to(device)
 
     # Predict between two ranges
-    start_datetime = datetime(2025, 4, 24, 0, 0, 0, tzinfo=timezone.utc)
-    end_datetime = datetime(2025, 5, 19, 22, 0, 0, tzinfo=timezone.utc)
+    start_datetime = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    end_datetime = datetime(2024, 12, 31, 22, 0, 0, tzinfo=timezone.utc)
 
     # Split it up into two-hour steps
     for start_time in pd.date_range(
         start_datetime, end_datetime, freq="2h", inclusive="both"
     ):
         end_time = start_time + timedelta(hours=2)
-        predict_from_to(start_time, end_time, model, config, "burst_plots")
+        predict_from_to(start_time, end_time, model, config, BASE_PATH)

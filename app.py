@@ -63,19 +63,20 @@ def download_csv(year, month, day, sort_by, min_proba, k) -> str:
     return csv_path
 
 
-def plot_bursts(min_proba, k, days=30):
+def plot_bursts(min_proba=0.5, days=30):
     dfs = []
     for i in range(days):
         d = datetime.now() - timedelta(days=i)
         y, m, da = str(d.year), f"{d.month:02d}", f"{d.day:02d}"
         df = load_image_paths(y, m, da, min_proba)
-        dfs.append(df)
+        if df is not None and not df.empty:
+            dfs.append(df)
 
     if not dfs:
         return {}
 
     all_data = pd.concat(dfs, ignore_index=True)
-    all_data = pd.concat(dfs, ignore_index=True)
+
     all_data["Day"] = all_data["Datetime"].dt.floor("D")
     # Calculate total daily counts
     daily_counts = all_data.groupby("Day").size().reset_index(name="Total Count")
@@ -170,6 +171,9 @@ def create_demo():
     months = [f"{m:02d}" for m in range(1, 13)]
     days = [f"{d:02d}" for d in range(1, 32)]
 
+    current_year, current_month, current_day = get_current_date()
+
+    # Create the Gradio interface
     with gr.Blocks(title="FlareSense Burst Detection") as demo:
         gr.Markdown(
             f"""
@@ -178,7 +182,7 @@ def create_demo():
             <p style="font-size:1.1em;">
 
             <b>A tool for detecting solar radio bursts on <a href="https://www.e-callisto.org/" target="_blank">E-callisto</a> Data.<br></b>
-            Select a date, sorting mode and minimum number of stations. Click on an image to increase its size. The Barplot is unaffected by the minimum Probability and minimum number of stations.<br>
+            Select a date, sorting mode and minimum number of stations. <br>
 
             Predictions update every 2 hours, using data from:<br>
             <b>{", ".join(INSTRUMENT_LIST)}</b>.
@@ -192,33 +196,16 @@ def create_demo():
             """
         )
 
-        # Bar Plot
-        line_plot = gr.Plot()
-        demo.load(
-            fn=plot_bursts,
-            inputs=None,
-            outputs=line_plot,
-        )
-
         with gr.Row():
-            year = gr.Dropdown(choices=years, label="Year")
-            month = gr.Dropdown(choices=months, label="Month")
-            day = gr.Dropdown(choices=days, label="Day")
-
-            demo.load(get_current_date, inputs=None, outputs=[year, month, day])
+            year = gr.Dropdown(choices=years, label="Year", value=current_year)
+            month = gr.Dropdown(choices=months, label="Month", value=current_month)
+            day = gr.Dropdown(choices=days, label="Day", value=current_day)
 
             # technically, can also be from a dropdown menu.
-            sort_by = SORT_BY_COLUMN
-            min_proba = MIN_PROBABILITY
+            sort_by = gr.State(SORT_BY_COLUMN)
+            min_proba = gr.State(MIN_PROBABILITY)
 
-            k_stations = gr.Slider(
-                minimum=1,
-                maximum=5,
-                step=1,
-                value=3,
-                label="Minimum Number of Stations (k)",
-                info="At least k stations must have detected the burst",
-            )
+            k_stations = gr.State(1)  # default value
         load_btn = gr.Button("Load Images")
 
         gallery = gr.Gallery(
@@ -227,11 +214,28 @@ def create_demo():
         table = gr.Dataframe(
             headers=["Datetime", "Instrument Location", "Probability"], wrap=False
         )
+        # Load images of today once
+        demo.load(
+            fn=load_images_and_table,  # same function
+            inputs=[
+                year,
+                month,
+                day,  # date dropdowns
+                sort_by,
+                min_proba,
+                k_stations,
+            ],
+            outputs=[gallery, table],
+        )
+
+        # Load images on button click
         load_btn.click(
             load_images_and_table,
             [year, month, day, sort_by, min_proba, k_stations],
             [gallery, table],
         )
+
+        # Load once
         download_btn = gr.Button("Download CSV")
         download_file = gr.File()  # outputs a file to download
 
@@ -239,6 +243,14 @@ def create_demo():
             fn=download_csv,
             inputs=[year, month, day, sort_by, min_proba, k_stations],
             outputs=download_file,
+        )
+
+        # Bar Plot with number of bursts per day
+        line_plot = gr.Plot()
+        demo.load(
+            fn=plot_bursts,
+            inputs=None,
+            outputs=line_plot,
         )
 
         return demo
