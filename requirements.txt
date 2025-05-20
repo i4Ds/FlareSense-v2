@@ -1,10 +1,11 @@
 datasets
-matplotlib
 evaluate
-transformers
-torchvision
-scikit-learn
-wandb
 lightning
+matplotlib
+scikit-learn
 seaborn
+torchvision
+transformers
+wandb
 ecallisto-ng
+
