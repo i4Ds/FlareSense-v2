@@ -37,6 +37,13 @@ For live prediction through a Gradio interface execute:
 python pred_live.py
 ```
 
+## Evaluation
+To reproduce our Results, run the following command:
+
+```bash
+python main.py --config configs/best_v2.yml
+```
+
 ## Notebooks
 
 All notebooks can be found in the `_notebooks` directory. They provide
