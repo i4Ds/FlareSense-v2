@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from huggingface_hub import hf_hub_download
-
+from tqdm.auto import tqdm
 
 import pandas as pd
 from pred_live import (
@@ -72,8 +72,8 @@ if __name__ == "__main__":
     end_datetime = datetime(2024, 12, 31, 22, 0, 0, tzinfo=timezone.utc)
 
     # Split it up into two-hour steps
-    for start_time in pd.date_range(
-        start_datetime, end_datetime, freq="2h", inclusive="both"
+    for start_time in tqdm(
+        pd.date_range(start_datetime, end_datetime, freq="2h", inclusive="both")
     ):
         end_time = start_time + timedelta(hours=2)
         predict_from_to(start_time, end_time, model, config, BASE_PATH)

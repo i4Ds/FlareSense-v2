@@ -17,19 +17,19 @@ from pred_live import INSTRUMENT_LIST
 
 
 def load_images(table, sort_by) -> List:
-    if sort_by == "Probability":
-        table = table.sort_values(by="Probability", ascending=False)
+    if sort_by == "Confidence":
+        table = table.sort_values(by="Confidence", ascending=False)
     else:
         table = table.sort_values(by="Datetime", ascending=False)
 
     img_data = []
     for _, row in table.iterrows():
-        img_data.append((row["Path"], row["Probability"]))
+        img_data.append((row["Path"], row["Confidence"]))
 
     if len(img_data) == 0:
         return ["style/DALLE_ERROR.png"]
 
-    return [(x[0], f"Probability: {x[1]:.2f}") for x in img_data]
+    return [(x[0], f"Confidence: {x[1]:.2f} %") for x in img_data]
 
 
 def load_image_paths(year, month, day, min_proba) -> pd.DataFrame:
@@ -46,7 +46,7 @@ def load_image_paths(year, month, day, min_proba) -> pd.DataFrame:
         dt = datetime.strptime(dt_str, "%d-%m-%Y %H-%M-%S")
         table_data.append([dt, antenna, proba, f])
     df = pd.DataFrame(
-        table_data, columns=["Datetime", "Instrument Location", "Probability", "Path"]
+        table_data, columns=["Datetime", "Instrument Location", "Confidence", "Path"]
     ).sort_values(by="Datetime", ascending=True)
 
     # Filter out antennas not in INSTRUMENT_LIST
@@ -134,7 +134,7 @@ def load_images_and_table(
             {
                 "Datetime": "first",
                 "Instrument Location": lambda x: ", ".join(set(x)),
-                "Probability": "mean",
+                "Confidence": "mean",
             }
         )
         .reset_index(drop=True)
@@ -212,7 +212,7 @@ def create_demo():
             object_fit="fill", elem_id="gallery", columns=[3], rows=[1], height="auto"
         )
         table = gr.Dataframe(
-            headers=["Datetime", "Instrument Location", "Probability"], wrap=False
+            headers=["Datetime", "Instrument Location", "Confidence"], wrap=False
         )
         # Load images of today once
         demo.load(
