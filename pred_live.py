@@ -247,12 +247,16 @@ if __name__ == "__main__":
         print(4 * "=" + " PREDICTION " + 4 * "=")
         now = datetime.now(timezone.utc)
 
-        # Calculate the next two-hour mark
-        next_run = now.replace(minute=0, second=0, microsecond=0) + timedelta(
-            hours=(now.hour % 2) + 2
-        )
+        # Calculate the next 30-minute mark
+        next_minute = ((now.minute // 30) + 1) * 30
+        if next_minute == 60:
+            next_run = now.replace(minute=0, second=0, microsecond=0) + timedelta(
+                hours=1
+            )
+        else:
+            next_run = now.replace(minute=next_minute, second=0, microsecond=0)
 
-        # Sleep for the time until the next two-hour mark
+        # Sleep for the time until the next 30-minute mark
         ts = (next_run - now).total_seconds()
         print(
             f"Next run at: {next_run} UTC. I will sleep for {ts} seconds.", flush=True
@@ -260,14 +264,13 @@ if __name__ == "__main__":
         time.sleep(ts)
 
         print(4 * "-" + " START " + 4 * "-")
-        # Prepare time range
-        now_minus_2h = (datetime.now(timezone.utc) - timedelta(hours=2)).replace(
-            second=0, microsecond=0
-        )
+        # Prepare time range: predict on the last 1 hour
+        end_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        start_time = end_time - timedelta(hours=1)
 
         # Print some logs, like start time and end time
-        print(f"Start time: {now_minus_2h - timedelta(hours=2)}")
-        print(f"End time: {now_minus_2h }")
+        print(f"Start time: {start_time}")
+        print(f"End time: {end_time}")
 
         # Predict
-        predict_from_to(now_minus_2h - timedelta(hours=2), now_minus_2h, model, config)
+        predict_from_to(start_time, end_time, model, config)
