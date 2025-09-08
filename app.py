@@ -498,6 +498,56 @@ def update_gallery_for_selected_group(
     return images_for_group(df, group_ts)
 
 
+def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
+    """
+    Create HTML for scrollable burst groups.
+    Each entry's header format: "Burst at [timestamp] seen by X antennas — Max conf: [value], Avg conf: [value]"
+    """
+    if df_all.empty:
+        return "<p>No burst data available.</p>"
+
+    # Group by TimeGroup and sort by newest first
+    grouped = df_all.groupby("TimeGroup")
+    html_content = ""
+
+    # Sort groups by newest first
+    for group_time in sorted(grouped.groups.keys(), reverse=True):
+        group_df = grouped.get_group(group_time).sort_values(
+            by="Confidence", ascending=False
+        )
+
+        # Calculate stats for this group
+        station_count = group_df["Instrument Location"].nunique()
+        max_conf = group_df["Confidence"].max()
+        avg_conf = group_df["Confidence"].mean()
+
+        # Create header with requested format
+        burst_time = group_time.strftime("%Y-%m-%d %H:%M UTC")
+        header = f"Burst at {burst_time} seen by {station_count} antennas — Max conf: {max_conf:.1f}%, Avg conf: {avg_conf:.1f}%"
+
+        html_content += f"<div style='margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 8px;'>"
+        html_content += f"<h3 style='color: #333; margin-top: 0;'>{header}</h3>"
+
+        # Group by instrument and show images
+        html_content += "<div style='display: flex; flex-wrap: wrap; gap: 15px;'>"
+        for instrument in group_df["Instrument Location"].unique():
+            instrument_data = group_df[group_df["Instrument Location"] == instrument]
+            best_detection = instrument_data.iloc[0]  # highest confidence
+
+            # Use the correct Gradio API path for newer versions
+            img_path = best_detection["Path"]
+
+            html_content += f"<div style='text-align: center; min-width: 200px;'>"
+            html_content += f"<h4 style='margin: 5px 0; color: #666; font-size: 14px;'>{instrument}</h4>"
+            html_content += f"<img src='/gradio_api/file={img_path}' style='max-width: 180px; max-height: 180px; border: 1px solid #ccc; border-radius: 4px;' alt='Burst detection'>"
+            html_content += f"<p style='margin: 5px 0; font-size: 12px; color: #888;'>Confidence: {best_detection['Confidence']:.1f}%</p>"
+            html_content += "</div>"
+
+        html_content += "</div></div>"
+
+    return html_content
+
+
 def load_latest(days_back: int, min_proba: float, min_stations: int):
     """
     Latest view: summarize groups across last N days, dropdown to pick a group, show gallery.
@@ -574,7 +624,97 @@ def create_app():
 
         with gr.Tabs():
             # -----------------------------------------------------
-            # 1) DATA BROWSER & EXPORT  (now FIRST tab)
+            # 1) LATEST (now FIRST tab)
+            # -----------------------------------------------------
+            with gr.TabItem("🔥 Latest"):
+                gr.Markdown("### Recent Solar Radio Burst Detections")
+                gr.Markdown("**Scrollable burst groups from the last 3 days**")
+
+                # Latest tab shows scrollable bursts with hardcoded settings
+                latest_bursts_html = gr.HTML()
+
+                # Load latest bursts on page load with fixed settings
+                def load_latest_bursts():
+                    """Load latest bursts with hardcoded settings: 3 days, conf ≥ 0.5, min 3 stations"""
+                    df_all = concatenate_days(days_back=3, min_proba=0.5)
+                    df_all = filter_by_min_stations(df_all, min_stations=3)
+
+                    if df_all.empty:
+                        return (
+                            "<p>No recent bursts found with the specified criteria.</p>"
+                        )
+
+                    # Create scrollable burst groups with the SAME format that was working before
+                    html_content = create_scrollable_burst_groups(df_all)
+
+                    # Add explanatory note
+                    note = """
+                    <div style='margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #666;'>
+                        <em>Plots show last 3 days, with confidence ≥ 0.5 and at least 3 stations.</em>
+                    </div>
+                    """
+
+                    return html_content + note
+
+                demo.load(
+                    fn=load_latest_bursts,
+                    inputs=None,
+                    outputs=latest_bursts_html,
+                )
+
+                # Refresh button for latest bursts
+                refresh_latest_btn = gr.Button("🔄 Refresh Latest", variant="primary")
+                refresh_latest_btn.click(
+                    fn=load_latest_bursts,
+                    inputs=None,
+                    outputs=latest_bursts_html,
+                )
+
+            # -----------------------------------------------------
+            # 2) TRENDS (now SECOND tab)
+            # -----------------------------------------------------
+            with gr.TabItem("📈 Trends"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        trend_days = gr.Slider(
+                            7, 90, value=30, step=1, label="Days span"
+                        )
+                        trend_min_proba = gr.Slider(
+                            0.1,
+                            1.0,
+                            value=DEFAULT_MIN_PROBA,
+                            step=0.1,
+                            label="Min Confidence",
+                        )
+                        refresh_trends = gr.Button("🔄 Refresh", variant="primary")
+                    with gr.Column(scale=2):
+                        gr.Markdown(
+                            "**Bursts per day by station (stacked) with 7‑day moving average**"
+                        )
+                        trend_plot = gr.Plot()
+                        gr.Markdown(
+                            "**Fast file-based detection counts (sanity check)**"
+                        )
+                        fast_plot = gr.Plot()
+
+                def load_trends(days: int, min_p: float):
+                    return plot_daily_by_station(days, min_p), plot_fast_daily_counts(
+                        days
+                    )
+
+                demo.load(
+                    fn=load_trends,
+                    inputs=[trend_days, trend_min_proba],
+                    outputs=[trend_plot, fast_plot],
+                )
+                refresh_trends.click(
+                    fn=load_trends,
+                    inputs=[trend_days, trend_min_proba],
+                    outputs=[trend_plot, fast_plot],
+                )
+
+            # -----------------------------------------------------
+            # 3) DATA BROWSER & EXPORT (now THIRD tab)
             # -----------------------------------------------------
             with gr.TabItem("🔎 Data Browser & Export"):
                 with gr.Row():
@@ -751,138 +891,6 @@ def create_app():
                     fn=do_export,
                     inputs=[date_text, min_proba, min_stations],
                     outputs=[export_file],
-                )
-
-            # -----------------------------------------------------
-            # 2) LATEST
-            # -----------------------------------------------------
-            with gr.TabItem("🔥 Latest"):
-                with gr.Row():
-                    with gr.Column(scale=1):
-                        days_back_latest = gr.Slider(
-                            1, 30, value=DEFAULT_DAYS_BACK, step=1, label="Days window"
-                        )
-                        min_proba_latest = gr.Slider(
-                            0.1,
-                            1.0,
-                            value=DEFAULT_MIN_PROBA,
-                            step=0.1,
-                            label="Min Confidence",
-                        )
-                        min_stations_latest = gr.Slider(
-                            1,
-                            10,
-                            value=DEFAULT_MIN_STATIONS,
-                            step=1,
-                            label="Min Stations",
-                        )
-                        refresh_latest = gr.Button("🔄 Refresh", variant="primary")
-                    with gr.Column(scale=2):
-                        latest_summary_html = gr.HTML()
-                        latest_groups_table = gr.Dataframe(
-                            headers=[
-                                "GroupStartUTC",
-                                "Stations",
-                                "Detections",
-                                "MaxConfidence",
-                            ],
-                            interactive=False,
-                            row_count=5,
-                        )
-                        latest_group_selector = gr.Dropdown(
-                            label="Select burst group", choices=[]
-                        )
-                        latest_gallery = gr.Gallery(columns=3, height="auto")
-
-                def load_latest_ui(days_w: int, min_p: float, min_k: int):
-                    return load_latest(days_w, min_p, min_k)
-
-                demo.load(
-                    fn=load_latest_ui,
-                    inputs=[days_back_latest, min_proba_latest, min_stations_latest],
-                    outputs=[
-                        latest_summary_html,
-                        latest_groups_table,
-                        latest_group_selector,
-                        gr.State([]),
-                        latest_gallery,
-                    ],
-                )
-                refresh_latest.click(
-                    fn=load_latest_ui,
-                    inputs=[days_back_latest, min_proba_latest, min_stations_latest],
-                    outputs=[
-                        latest_summary_html,
-                        latest_groups_table,
-                        latest_group_selector,
-                        gr.State([]),
-                        latest_gallery,
-                    ],
-                )
-
-                # Update latest gallery when selection changes
-                def latest_gallery_update(
-                    selected_label: str, days_w: int, min_p: float, min_k: int
-                ):
-                    df_all = concatenate_days(days_w, min_p)
-                    df_all = filter_by_min_stations(df_all, min_k)
-                    if not selected_label or df_all.empty:
-                        return []
-                    ts = pd.to_datetime(selected_label.split("|")[0].strip() + ":00")
-                    return images_for_group(df_all, ts)
-
-                latest_group_selector.change(
-                    fn=latest_gallery_update,
-                    inputs=[
-                        latest_group_selector,
-                        days_back_latest,
-                        min_proba_latest,
-                        min_stations_latest,
-                    ],
-                    outputs=[latest_gallery],
-                )
-
-            # -----------------------------------------------------
-            # 3) TRENDS
-            # -----------------------------------------------------
-            with gr.TabItem("📈 Trends"):
-                with gr.Row():
-                    with gr.Column(scale=1):
-                        trend_days = gr.Slider(
-                            7, 90, value=30, step=1, label="Days span"
-                        )
-                        trend_min_proba = gr.Slider(
-                            0.1,
-                            1.0,
-                            value=DEFAULT_MIN_PROBA,
-                            step=0.1,
-                            label="Min Confidence",
-                        )
-                        refresh_trends = gr.Button("🔄 Refresh", variant="primary")
-                    with gr.Column(scale=2):
-                        gr.Markdown(
-                            "**Bursts per day by station (stacked) with 7‑day moving average**"
-                        )
-                        trend_plot = gr.Plot()
-                        gr.Markdown(
-                            "**Fast file-based detection counts (sanity check)**"
-                        )
-                        fast_plot = gr.Plot()
-
-                def load_trends(days: int, min_p: float):
-                    return plot_daily_by_station(days, min_p), plot_fast_daily_counts(
-                        days
-                    )
-
-                demo.load(
-                    fn=load_trends,
-                    inputs=[trend_days, trend_min_proba],
-                    outputs=[trend_plot, fast_plot],
-                )
-                refresh_trends.click(
-                    fn=load_trends,
-                    inputs=[trend_days, trend_min_proba],
-                    outputs=[trend_plot, fast_plot],
                 )
 
         return demo
