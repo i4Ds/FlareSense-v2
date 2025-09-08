@@ -68,7 +68,7 @@ if __name__ == "__main__":
     model.to(device)
 
     # Predict between two ranges
-    start_datetime = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    start_datetime = datetime(2024, 4, 1, 0, 0, 0, tzinfo=timezone.utc)
     end_datetime = datetime(2024, 12, 31, 22, 0, 0, tzinfo=timezone.utc)
 
     # Split it up into two-hour steps
