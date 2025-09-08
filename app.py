@@ -306,55 +306,63 @@ def plot_all_data_with_ma():
     Fast and simple without caching.
     """
     days_to_show = 60
-    start_date = datetime.now() - timedelta(days=days_to_show)
     today = today_date()
-    
+
     # Fast filesystem walk for last 60 days only
     daily_data = []
-    
+
     for i in range(days_to_show):
         current_date = today - timedelta(days=i)
         year, month, day = ymd_from_date(current_date)
         day_path = os.path.join(BASE_PATH, year, month, day)
-        
+
         if not os.path.exists(day_path):
             continue
-        
+
         # Count files per station for this day
         for station_dir in os.listdir(day_path):
             station_path = os.path.join(day_path, station_dir)
             if not os.path.isdir(station_path) or station_dir not in INSTRUMENT_LIST:
                 continue
-            
+
             # Count PNG files in this station directory
             try:
-                png_count = len([f for f in os.listdir(station_path) if f.endswith('.png')])
+                png_count = len(
+                    [f for f in os.listdir(station_path) if f.endswith(".png")]
+                )
                 if png_count > 0:
-                    daily_data.append({
-                        'Day': current_date,
-                        'Instrument Location': station_dir,
-                        'Count': png_count
-                    })
+                    daily_data.append(
+                        {
+                            "Day": current_date,
+                            "Instrument Location": station_dir,
+                            "Count": png_count,
+                        }
+                    )
             except (OSError, PermissionError):
                 continue
-    
+
     if not daily_data:
         fig = go.Figure()
         fig.add_annotation(
             text="No data available for the last 60 days",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
         )
         return fig
 
     # Convert to DataFrame and process
     df = pd.DataFrame(daily_data)
-    df['Day'] = pd.to_datetime(df['Day'])
-    
+    df["Day"] = pd.to_datetime(df["Day"])
+
     # Calculate daily totals and 7-day MA
-    daily_counts = df.groupby('Day')['Count'].sum().reset_index()
-    daily_counts.columns = ['Day', 'Total Count']
-    daily_counts['MA_7'] = daily_counts['Total Count'].rolling(window=7, center=True).mean()
+    daily_counts = df.groupby("Day")["Count"].sum().reset_index()
+    daily_counts.columns = ["Day", "Total Count"]
+    daily_counts["MA_7"] = (
+        daily_counts["Total Count"].rolling(window=7, center=True).mean()
+    )
 
     # Create stacked bar chart
     fig = px.bar(
@@ -366,7 +374,7 @@ def plot_all_data_with_ma():
         title="Solar Radio Bursts (Last 60 Days) with 7-Day Moving Average",
         labels={"Day": "Date", "Count": "Bursts"},
     )
-    
+
     # Add 7-day moving average line
     fig.add_trace(
         go.Scatter(
@@ -375,40 +383,37 @@ def plot_all_data_with_ma():
             mode="lines",
             name="7-Day Moving Average",
             line=dict(color="red", width=3),
-            yaxis="y2"
+            yaxis="y2",
         )
     )
-    
+
     # Update layout for dual y-axis and move legend to right
     fig.update_layout(
         hovermode="x unified",
         xaxis_title="Date",
         yaxis_title="Daily Burst Detections",
         yaxis2=dict(
-            title="7-Day Moving Average",
-            overlaying="y",
-            side="right",
-            showgrid=False
+            title="7-Day Moving Average", overlaying="y", side="right", showgrid=False
         ),
         font=dict(size=12),
         height=600,
+        width=1600,
         showlegend=True,
         legend=dict(
             orientation="v",  # Vertical orientation
             yanchor="top",
             y=1,
-            xanchor="left", 
-            x=1.02  # Position to the right of the plot
+            xanchor="left",
+            x=1.02,  # Position to the right of the plot
         ),
-        margin=dict(r=200)  # Add right margin for legend
+        margin=dict(r=500),  # Add right margin for legend
     )
-    
+
     # Configure for better interactivity
     fig.update_layout(
-        modebar_add=['select2d', 'lasso2d'],
-        modebar_remove=['pan2d', 'autoScale2d']
+        modebar_add=["select2d", "lasso2d"], modebar_remove=["pan2d", "autoScale2d"]
     )
-    
+
     return fig
 
 
@@ -418,53 +423,61 @@ def generate_burst_statistics():
     """
     days_to_show = 60
     today = today_date()
-    
+
     # Fast count for last 60 days
     total_bursts = 0
     instrument_counts = {}
     days_with_data = set()
-    
+
     for i in range(days_to_show):
         current_date = today - timedelta(days=i)
         year, month, day = ymd_from_date(current_date)
         day_path = os.path.join(BASE_PATH, year, month, day)
-        
+
         if not os.path.exists(day_path):
             continue
-        
+
         day_has_data = False
         for station_dir in os.listdir(day_path):
             station_path = os.path.join(day_path, station_dir)
             if not os.path.isdir(station_path) or station_dir not in INSTRUMENT_LIST:
                 continue
-            
+
             try:
-                png_count = len([f for f in os.listdir(station_path) if f.endswith('.png')])
+                png_count = len(
+                    [f for f in os.listdir(station_path) if f.endswith(".png")]
+                )
                 if png_count > 0:
                     total_bursts += png_count
-                    instrument_counts[station_dir] = instrument_counts.get(station_dir, 0) + png_count
+                    instrument_counts[station_dir] = (
+                        instrument_counts.get(station_dir, 0) + png_count
+                    )
                     day_has_data = True
             except (OSError, PermissionError):
                 continue
-        
+
         if day_has_data:
             days_with_data.add(current_date.date())
-    
+
     if total_bursts == 0:
         return "<p>No data available for statistics.</p>"
-    
+
     # Calculate statistics
     total_days_with_data = len(days_with_data)
-    avg_bursts_per_day = total_bursts / total_days_with_data if total_days_with_data > 0 else 0
-    
+    avg_bursts_per_day = (
+        total_bursts / total_days_with_data if total_days_with_data > 0 else 0
+    )
+
     # Recent activity (last 7 days)
     recent_cutoff = today - timedelta(days=7)
     recent_days = [d for d in days_with_data if d >= recent_cutoff.date()]
     recent_avg = (len(recent_days) * avg_bursts_per_day) / 7 if recent_days else 0
-    
+
     # Sort instruments by count
-    sorted_instruments = sorted(instrument_counts.items(), key=lambda x: x[1], reverse=True)
-    
+    sorted_instruments = sorted(
+        instrument_counts.items(), key=lambda x: x[1], reverse=True
+    )
+
     html = f"""
     <div style='background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;'>
         <h3 style='color: #333; margin-top: 0;'>📊 Burst Detection Statistics (Last 60 Days)</h3>
@@ -491,7 +504,7 @@ def generate_burst_statistics():
         <h4 style='color: #333; margin-bottom: 10px;'>🏢 Detection Images by Instrument:</h4>
         <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;'>
     """
-    
+
     for instrument, count in sorted_instruments[:15]:  # Top 15 instruments
         percentage = (count / total_bursts) * 100
         html += f"""
@@ -500,12 +513,12 @@ def generate_burst_statistics():
                 <span style='color: #666; font-weight: bold;'>{count:,} ({percentage:.1f}%)</span>
             </div>
         """
-    
+
     html += """
         </div>
     </div>
     """
-    
+
     return html
 
 
@@ -802,7 +815,6 @@ def create_app():
             # -----------------------------------------------------
             with gr.TabItem("🔥 Latest"):
                 gr.Markdown("### Recent Solar Radio Burst Detections")
-                gr.Markdown("**Scrollable burst groups from the last 3 days**")
 
                 # Latest tab shows scrollable bursts with hardcoded settings
                 latest_bursts_html = gr.HTML()
@@ -845,14 +857,11 @@ def create_app():
                 )
 
             # -----------------------------------------------------
-            # 2) TRENDS (load only when button clicked)
+            # 2) TRENDS (load when tab is viewed)
             # -----------------------------------------------------
             with gr.TabItem("📈 Trends"):
                 gr.Markdown("**Solar Radio Burst Trends (Last 60 Days)**")
-                
-                with gr.Row():
-                    load_trends_btn = gr.Button("📊 Load Trends", variant="primary", size="lg")
-                
+
                 # Full width plot
                 trend_plot = gr.Plot(show_label=False, container=True)
                 statistics_html = gr.HTML()
@@ -860,74 +869,10 @@ def create_app():
                 def load_all_trends():
                     return plot_all_data_with_ma(), generate_burst_statistics()
 
-                # Load trends only when button is clicked (not on page load)
-                load_trends_btn.click(
-                    fn=load_all_trends,
-                    outputs=[trend_plot, statistics_html],
-                )
-
-            # -----------------------------------------------------
-            # 2) TRENDS (now SECOND tab)
-            # -----------------------------------------------------
-            # 2) TRENDS (simplified - all data, no selectors)
-            # -----------------------------------------------------
-            with gr.TabItem("� Trends"):
-                with gr.Column():
-                    with gr.Row():
-                        gr.Markdown("**Solar Radio Burst Trends (Last 60 Days)**")
-                        open_plot_btn = gr.Button("🔗 Open Plot in New Window", variant="secondary", size="sm")
-                    
-                    trend_plot = gr.Plot(show_label=False)
-                    statistics_html = gr.HTML()
-
-                def load_all_trends():
-                    return plot_all_data_with_ma(), generate_burst_statistics()
-
-                def open_plot_new_window():
-                    """Generate HTML that opens the plot in a new window"""
-                    fig = plot_all_data_with_ma()
-                    html_str = fig.to_html(include_plotlyjs='cdn', div_id="trend_plot_fullscreen")
-                    
-                    # Create a temporary HTML file
-                    import tempfile
-                    import webbrowser
-                    import os
-                    
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
-                        f.write(f"""
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <title>Solar Radio Burst Trends - FlareSense</title>
-                            <style>
-                                body {{ margin: 0; padding: 20px; font-family: Arial, sans-serif; }}
-                                h1 {{ color: #333; }}
-                            </style>
-                        </head>
-                        <body>
-                            <h1>🌞 Solar Radio Burst Trends (Last 60 Days)</h1>
-                            {html_str}
-                        </body>
-                        </html>
-                        """)
-                        temp_path = f.name
-                    
-                    # JavaScript to open in new window
-                    return f"""
-                    <script>
-                        window.open('file://{temp_path}', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-                    </script>
-                    <p style='color: green;'>Plot opened in new window!</p>
-                    """
-
+                # Load trends when the tab becomes visible
                 demo.load(
                     fn=load_all_trends,
                     outputs=[trend_plot, statistics_html],
-                )
-                
-                open_plot_btn.click(
-                    fn=open_plot_new_window,
-                    outputs=[statistics_html],
                 )
 
             # -----------------------------------------------------
@@ -942,7 +887,7 @@ def create_app():
                             value=today_date().strftime("%Y-%m-%d"),
                             placeholder="e.g. 2025-09-01, 9.1.2025, today, yesterday",
                         )
-                        
+
                         gr.Markdown("### Export", elem_classes=["section-card"])
                         export_btn = gr.Button(
                             "📦 Download ZIP (Bursts + Images)", variant="primary"
@@ -961,7 +906,10 @@ def create_app():
                         )
 
                     with gr.Column(scale=2):
-                        gr.Markdown("### Bursts for Selected Date", elem_classes=["section-card"])
+                        gr.Markdown(
+                            "### Bursts for Selected Date",
+                            elem_classes=["section-card"],
+                        )
                         date_bursts_html = gr.HTML()
 
                 def load_date_bursts(date_text_val: str):
@@ -969,23 +917,29 @@ def create_app():
                     dt = parse_date_text(date_text_val)
                     if not dt:
                         return "<p>Invalid date format. Please try again.</p>"
-                    
+
                     # Load data for the specific day
                     df_day = load_image_paths_for_date(dt, min_proba=0.5)
-                    
+
                     if df_day.empty:
                         return f"<p>No bursts found for {dt.strftime('%Y-%m-%d')} with confidence ≥ 50%.</p>"
-                    
+
                     # Apply minimum stations filter (same as Latest tab)
                     df_day["TimeGroup"] = df_day["Datetime"].dt.floor("15min")
-                    station_counts = df_day.groupby("TimeGroup")["Instrument Location"].nunique().reset_index()
+                    station_counts = (
+                        df_day.groupby("TimeGroup")["Instrument Location"]
+                        .nunique()
+                        .reset_index()
+                    )
                     station_counts.columns = ["TimeGroup", "station_count"]
-                    valid_groups = station_counts[station_counts["station_count"] >= 3]["TimeGroup"]
+                    valid_groups = station_counts[station_counts["station_count"] >= 3][
+                        "TimeGroup"
+                    ]
                     df_filtered = df_day[df_day["TimeGroup"].isin(valid_groups)]
-                    
+
                     if df_filtered.empty:
                         return f"<p>No bursts found for {dt.strftime('%Y-%m-%d')} with minimum 3 stations and confidence ≥ 50%.</p>"
-                    
+
                     return create_scrollable_burst_groups(df_filtered)
 
                 def export_date_data(date_text_val: str):
@@ -993,23 +947,29 @@ def create_app():
                     dt = parse_date_text(date_text_val)
                     if not dt:
                         return None
-                    
+
                     # Load data for the specific day
                     df_day = load_image_paths_for_date(dt, min_proba=0.5)
-                    
+
                     if df_day.empty:
                         return None
-                    
+
                     # Apply minimum stations filter (same as Latest tab)
                     df_day["TimeGroup"] = df_day["Datetime"].dt.floor("15min")
-                    station_counts = df_day.groupby("TimeGroup")["Instrument Location"].nunique().reset_index()
+                    station_counts = (
+                        df_day.groupby("TimeGroup")["Instrument Location"]
+                        .nunique()
+                        .reset_index()
+                    )
                     station_counts.columns = ["TimeGroup", "station_count"]
-                    valid_groups = station_counts[station_counts["station_count"] >= 3]["TimeGroup"]
+                    valid_groups = station_counts[station_counts["station_count"] >= 3][
+                        "TimeGroup"
+                    ]
                     df_filtered = df_day[df_day["TimeGroup"].isin(valid_groups)]
-                    
+
                     if df_filtered.empty:
                         return None
-                    
+
                     return create_zip_export_for_date(dt, min_proba=0.5, min_stations=3)
 
                 # Initial load
