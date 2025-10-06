@@ -1005,4 +1005,4 @@ if __name__ == "__main__":
     # Small guard: ensure regex util available
     # (we import inside main to avoid global import if not run)
     demo = create_app()
-    demo.launch(allowed_paths=[BASE_PATH])
+    demo.launch(allowed_paths=[BASE_PATH, "static"])

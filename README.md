@@ -79,6 +79,7 @@ sudo systemctl restart flaresense.service
 sudo systemctl daemon-reload
 ```
 
+The .serice-file can be found here: /etc/systemd/system/flaresense_app.service
 ---
 
 This repository is provided for reference without any warranty.
