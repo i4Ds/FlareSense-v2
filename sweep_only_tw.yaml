@@ -1,0 +1,44 @@
+#https://docs.wandb.ai/guides/sweeps/quickstart
+program: main.py
+method: bayes
+project: FlareSense-v2
+entity: vincenzo-timmel
+metric:
+  name: test_avg_f1
+  goal: maximize
+parameters:
+  general:
+    parameters:
+      max_epochs:
+        max: 50
+        min: 15
+  model:
+    parameters:
+      lr:
+        max: 1.0e-3
+        min: 1.0e-6
+      label_smoothing:
+        max: 0.2
+        min: 0.0
+      model_type:
+        values: [resnet18, resnet34]
+      weight_decay:
+        max: 1.0e-3
+        min: 1.0e-9
+      warmup_epochs:
+        max: 20
+        min: 3
+  data:
+    parameters:
+      use_augmentation:
+        values: [True]
+      time_warp_w:
+        max: 750
+        min: 300
+
+
+command:
+  - ${interpreter}
+  - ${program}
+  - "--config"
+  - "configs/test_v2.yml" #Insert your model here (do not push it, adapt it each time.)

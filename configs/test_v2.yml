@@ -1,6 +1,6 @@
 general:
   batch_size: 64
-  max_epochs: 100
+  max_epochs: 25
   binary: True
   use_random_sampler: False
   use_class_weights: True
@@ -9,10 +9,10 @@ model:
   model_type: resnet34
   input_size: [128, 512]
   optimizer_name: adamw
-  warmup_epochs: 1
-  lr: 0.0023439
-  label_smoothing: 0.12465
-  weight_decay: 8.9648e-7
+  warmup_epochs: 12
+  lr: 0.00023762695665743765
+  label_smoothing: 0.11739565855800864
+  weight_decay: 0.0005164989055101516
 
 data:
   train_path: [i4ds/ecallisto_radio_sunburst, i4ds/ecallisto_radio_sunburst]
@@ -32,8 +32,12 @@ data:
   clip_to_range: False
   train_class_to_reduce: 0
   reduction_fraction: 0.2
-  use_augmentation: True
-  frequency_masking_para: 77
-  time_masking_para: 155
-  freq_mask_method: min
-  time_warp_w: 450
+  use_augmentation: False
+  frequency_masking_para: 0
+  time_masking_para: 0
+  freq_mask_method: random
+  time_warp_w: 0
+  pred_path: i4ds/ecallisto_radio_sunburst
+  pred_split: train
+
+# https://wandb.ai/vincenzo-timmel/FlareSense-v2/runs/dfpxq6wo/overview
