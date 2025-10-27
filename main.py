@@ -38,8 +38,13 @@ if __name__ == "__main__":
         print("GPU is not available.")
         device = "cpu"
 
-    # Mixed precision
+    # Mixed precision and performance optimizations
     torch.set_float32_matmul_precision("high")
+
+    # Enable cuDNN benchmarking for additional speedup
+    # This finds the best convolution algorithms for your specific hardware
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
 
     # Argument parser for config file path
     parser = argparse.ArgumentParser(description="Training Configuration")
@@ -205,6 +210,7 @@ if __name__ == "__main__":
         val_check_interval=1.0,  # Every Epoch.
         # callbacks=[checkpoint_callback_f1, early_stopping_callback],
         callbacks=[lr_monitor],
+        precision="16-mixed",  # Enable automatic mixed precision training
     )
 
     # Train
