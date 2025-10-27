@@ -167,7 +167,7 @@ if __name__ == "__main__":
         ds_train,
         sampler=sampler,
         batch_size=config["general"]["batch_size"],
-        num_workers=16,
+        num_workers=24,
         prefetch_factor=4,
         pin_memory=True,
         shuffle=False if sampler is not None else True,
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(
         ds_valid,
         batch_size=config["general"]["batch_size"],
-        num_workers=16,
+        num_workers=24,
         prefetch_factor=4,
         pin_memory=True,
         shuffle=False,
