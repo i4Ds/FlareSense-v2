@@ -361,7 +361,7 @@ def plot_all_data_with_ma():
     daily_counts = df.groupby("Day")["Count"].sum().reset_index()
     daily_counts.columns = ["Day", "Total Count"]
     daily_counts["MA_7"] = (
-        daily_counts["Total Count"].rolling(window=7, center=True).mean()
+        daily_counts["Total Count"].rolling(window=7, center=False).mean()
     )
 
     # Create stacked bar chart
@@ -787,6 +787,27 @@ def load_latest(days_back: int, min_proba: float, min_stations: int):
 # -----------------------------
 # BUILD APP
 # -----------------------------
+def load_latest_bursts():
+    """Load latest bursts with hardcoded settings: 3 days, conf ≥ 0.5, min 3 stations"""
+    df_all = concatenate_days(days_back=3, min_proba=0.5)
+    df_all = filter_by_min_stations(df_all, min_stations=3)
+
+    if df_all.empty:
+        return "<p>No recent bursts found with the specified criteria.</p>"
+
+    # Create scrollable burst groups with the SAME format that was working before
+    html_content = create_scrollable_burst_groups(df_all)
+
+    # Add explanatory note
+    note = """
+    <div style='margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #666;'>
+        <em>Plots show last 3 days, with confidence ≥ 0.5 and at least 3 stations.</em>
+    </div>
+    """
+
+    return html_content + note
+
+
 def create_app():
     with gr.Blocks(
         title="FlareSense Burst Detection",
@@ -802,8 +823,9 @@ def create_app():
             <div style="border:1px solid #ccc; padding:15px; border-radius:5px;">
               <h1 style="margin-top:0;">🌞 FlareSense by <a href="https://i4ds.ch/" target="_blank">i4ds@fhnw</a></h1>
               <p style="font-size:1.05em;">
-                <b>Real-time detection of solar radio bursts using <a href="https://www.e-callisto.org/" target="_blank">E-Callisto</a> data.</b><br>
-                Updates every 30 minutes from <b>{len(INSTRUMENT_LIST)}</b> monitoring stations worldwide.
+                <b>Real-time detection of <a href="https://en.wikipedia.org/wiki/Solar_radio_burst" target="_blank">solar radio bursts</a> using <a href="https://www.e-callisto.org/" target="_blank">E-Callisto</a> data.</b><br></b><br>
+                Updates every 15 minutes from <b>{len(INSTRUMENT_LIST)}</b> monitoring stations worldwide.<br>
+                <small>Powered by <a href="https://huggingface.co/i4ds/flaresense-v2" target="_blank">FlareSense ML Model</a></small>
               </p>
             </div>
             """
@@ -820,28 +842,6 @@ def create_app():
                 latest_bursts_html = gr.HTML()
 
                 # Load latest bursts on page load with fixed settings
-                def load_latest_bursts():
-                    """Load latest bursts with hardcoded settings: 3 days, conf ≥ 0.5, min 3 stations"""
-                    df_all = concatenate_days(days_back=3, min_proba=0.5)
-                    df_all = filter_by_min_stations(df_all, min_stations=3)
-
-                    if df_all.empty:
-                        return (
-                            "<p>No recent bursts found with the specified criteria.</p>"
-                        )
-
-                    # Create scrollable burst groups with the SAME format that was working before
-                    html_content = create_scrollable_burst_groups(df_all)
-
-                    # Add explanatory note
-                    note = """
-                    <div style='margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #666;'>
-                        <em>Plots show last 3 days, with confidence ≥ 0.5 and at least 3 stations.</em>
-                    </div>
-                    """
-
-                    return html_content + note
-
                 demo.load(
                     fn=load_latest_bursts,
                     inputs=None,

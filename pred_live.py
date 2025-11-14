@@ -49,6 +49,7 @@ INSTRUMENT_LIST = [
     "EGYPT-Alexandria_02",
     "EGYPT-SpaceAgency_01",
     "GERMANY-DLR_63",
+    "POLAND-BALDY_62",
     "GLASGOW_01",
     "GREENLAND_62",
     "HUMAIN_59",
@@ -247,16 +248,17 @@ if __name__ == "__main__":
         print(4 * "=" + " PREDICTION " + 4 * "=")
         now = datetime.now(timezone.utc)
 
-        # Calculate the next 30-minute mark
-        next_minute = ((now.minute // 30) + 1) * 30
-        if next_minute == 60:
+        # Calculate the next 15-minute mark
+        current_15min_block = now.minute // 15
+        next_minute = (current_15min_block + 1) * 15
+        if next_minute >= 60:
             next_run = now.replace(minute=0, second=0, microsecond=0) + timedelta(
                 hours=1
             )
         else:
             next_run = now.replace(minute=next_minute, second=0, microsecond=0)
 
-        # Sleep for the time until the next 30-minute mark
+        # Sleep for the time until the next 15-minute mark
         ts = (next_run - now).total_seconds()
         print(
             f"Next run at: {next_run} UTC. I will sleep for {ts} seconds.", flush=True
@@ -264,9 +266,9 @@ if __name__ == "__main__":
         time.sleep(ts)
 
         print(4 * "-" + " START " + 4 * "-")
-        # Prepare time range: predict on the last 1 hour
+        # Prepare time range: predict on the last 30 minutes
         end_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-        start_time = end_time - timedelta(hours=1)
+        start_time = end_time - timedelta(minutes=30)
 
         # Print some logs, like start time and end time
         print(f"Start time: {start_time}")
