@@ -268,7 +268,7 @@ if __name__ == "__main__":
         print(4 * "-" + " START " + 4 * "-")
         # Prepare time range: predict on the last 30 minutes
         end_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-        start_time = end_time - timedelta(minutes=30)
+        start_time = end_time - timedelta(minutes=60)
 
         # Print some logs, like start time and end time
         print(f"Start time: {start_time}")
