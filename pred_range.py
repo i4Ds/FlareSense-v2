@@ -38,8 +38,8 @@ if __name__ == "__main__":
     model.to(device)
 
     # Predict between two ranges
-    start_datetime = datetime(2025, 11, 14, 0, 0, 0, tzinfo=timezone.utc)
-    end_datetime = datetime(2025, 11, 14, 22, 0, 0, tzinfo=timezone.utc)
+    start_datetime = datetime(2025, 12, 4, 16, 0, 0, tzinfo=timezone.utc)
+    end_datetime = datetime(2025, 12, 4, 21, 0, 0, tzinfo=timezone.utc)
 
     # Split it up into two-hour steps
     for start_time in tqdm(

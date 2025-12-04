@@ -54,7 +54,7 @@ INSTRUMENT_LIST = [
     "GREENLAND_62",
     "HUMAIN_59",
     "HURBANOVO_59",
-    "INDIA-GAURI_59",
+    "INDIA-GAURI_02",
     "INDIA-OOTY_02",
     "INDIA-UDAIPUR_03",
     "INDONESIA_59",
@@ -250,7 +250,9 @@ if __name__ == "__main__":
 
         # Calculate the next 15-minute mark (simpler approach)
         minutes_to_next = 15 - (now.minute % 15)
-        next_run = (now + timedelta(minutes=minutes_to_next)).replace(second=0, microsecond=0)
+        next_run = (now + timedelta(minutes=minutes_to_next)).replace(
+            second=0, microsecond=0
+        )
 
         # Sleep for the time until the next 15-minute mark
         ts = (next_run - now).total_seconds()
@@ -263,7 +265,7 @@ if __name__ == "__main__":
         # Prepare time range: predict on the last 30 minutes based on next_run (not datetime.now())
         # This ensures consistent, predictable time boundaries
         end_time = next_run
-        start_time = end_time - timedelta(minutes=30)
+        start_time = end_time - timedelta(minutes=60)
 
         # Print some logs, like start time and end time
         print(f"Start time: {start_time}")
