@@ -222,6 +222,9 @@ def predict_from_to(start_datetime, end_datetime, model, config, base_path=None)
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
             fig.write_image(out_path)
 
+    except Exception as e:
+        print(f"Error during prediction: {e}")
+
     finally:
         shutil.rmtree(tmp_dir)
         print(4 * "-" + " END " + 4 * "-")
