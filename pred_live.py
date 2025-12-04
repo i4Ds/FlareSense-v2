@@ -248,7 +248,7 @@ if __name__ == "__main__":
         print(4 * "=" + " PREDICTION " + 4 * "=")
         now = datetime.now(timezone.utc)
 
-        # Calculate the next 15-minute mark (simpler approach)
+        # Calculate the next 15-minute mark
         minutes_to_next = 15 - (now.minute % 15)
         next_run = (now + timedelta(minutes=minutes_to_next)).replace(
             second=0, microsecond=0
@@ -262,7 +262,7 @@ if __name__ == "__main__":
         time.sleep(ts)
 
         print(4 * "-" + " START " + 4 * "-")
-        # Prepare time range: predict on the last 30 minutes based on next_run (not datetime.now())
+        # Prepare time range: predict on the last 60 minutes based on next_run
         # This ensures consistent, predictable time boundaries
         end_time = next_run
         start_time = end_time - timedelta(minutes=60)
