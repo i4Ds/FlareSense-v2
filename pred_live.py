@@ -248,15 +248,9 @@ if __name__ == "__main__":
         print(4 * "=" + " PREDICTION " + 4 * "=")
         now = datetime.now(timezone.utc)
 
-        # Calculate the next 15-minute mark
-        current_15min_block = now.minute // 15
-        next_minute = (current_15min_block + 1) * 15
-        if next_minute >= 60:
-            next_run = now.replace(minute=0, second=0, microsecond=0) + timedelta(
-                hours=1
-            )
-        else:
-            next_run = now.replace(minute=next_minute, second=0, microsecond=0)
+        # Calculate the next 15-minute mark (simpler approach)
+        minutes_to_next = 15 - (now.minute % 15)
+        next_run = (now + timedelta(minutes=minutes_to_next)).replace(second=0, microsecond=0)
 
         # Sleep for the time until the next 15-minute mark
         ts = (next_run - now).total_seconds()
@@ -266,9 +260,10 @@ if __name__ == "__main__":
         time.sleep(ts)
 
         print(4 * "-" + " START " + 4 * "-")
-        # Prepare time range: predict on the last 30 minutes
-        end_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-        start_time = end_time - timedelta(minutes=60)
+        # Prepare time range: predict on the last 30 minutes based on next_run (not datetime.now())
+        # This ensures consistent, predictable time boundaries
+        end_time = next_run
+        start_time = end_time - timedelta(minutes=30)
 
         # Print some logs, like start time and end time
         print(f"Start time: {start_time}")

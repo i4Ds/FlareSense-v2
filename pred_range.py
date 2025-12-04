@@ -19,36 +19,6 @@ from app import BASE_PATH
 # Model Parameters
 torch.set_float32_matmul_precision("high")
 
-# Parameters
-INSTRUMENT_LIST = [
-    "ALMATY_59",
-    "Australia-ASSA_57",
-    "Australia-ASSA_63",
-    "AUSTRIA-UNIGRAZ_01",
-    "EGYPT-SpaceAgency_01",
-    "GERMANY-DLR_63",
-    "HUMAIN_59",
-    "INDIA-GAURI_59",
-    "INDIA-UDAIPUR_03",
-    "MEXART_59",
-    "MEXICO-LANCE-B_62",
-    "NORWAY-EGERSUND_01",
-    "ROMANIA_01",
-    "ROSWELL-NM_59",
-    "SSRT_59",
-    "TRIEST_57",
-    "ALASKA-HAARP_62",
-    "KASI_59",
-    "Malaysia-Banting_01",
-    "MONGOLIA-UB_01",
-    "UZBEKISTAN_01",
-    "INDONESIA_59",
-    "ITALY-Strassolt_01",
-    "MONGOLIA-UB_01",
-    "SWISS-IRSOL_01",
-    "SWISS-Landschlacht_62",
-]
-
 if __name__ == "__main__":
     if not os.path.exists(BASE_PATH):
         os.makedirs(BASE_PATH)
@@ -68,8 +38,8 @@ if __name__ == "__main__":
     model.to(device)
 
     # Predict between two ranges
-    start_datetime = datetime(2024, 4, 1, 0, 0, 0, tzinfo=timezone.utc)
-    end_datetime = datetime(2024, 12, 31, 22, 0, 0, tzinfo=timezone.utc)
+    start_datetime = datetime(2025, 11, 14, 0, 0, 0, tzinfo=timezone.utc)
+    end_datetime = datetime(2025, 11, 14, 22, 0, 0, tzinfo=timezone.utc)
 
     # Split it up into two-hour steps
     for start_time in tqdm(
