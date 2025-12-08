@@ -14,6 +14,8 @@ import gradio as gr
 # CONFIG
 # -----------------------------
 BASE_PATH = os.path.join("/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images")
+# Hidden path for UI links
+# Basically, a mounted version without the full filesystem path
 BASE_HIDDEN_PATH = os.path.join("/srv/flaresense-data/burst_live_images")
 TIMEGROUP_MINUTES = 15
 DEFAULT_MIN_PROBA = 0.5
