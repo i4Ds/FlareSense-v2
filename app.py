@@ -14,11 +14,10 @@ import gradio as gr
 # CONFIG
 # -----------------------------
 BASE_PATH = os.path.join("/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images")
+BASE_HIDDEN_PATH = os.path.join("/srv/flaresense-data/burst_live_images")
 TIMEGROUP_MINUTES = 15
 DEFAULT_MIN_PROBA = 0.5
-DEFAULT_MIN_STATIONS = 1
-DEFAULT_DAYS_BACK = 5
-DAYS_SCROLL_MAX = 60  # how far back the "Days back" slider can go
+DEFAULT_MIN_STATIONS = 3
 
 # Your existing list of valid instruments
 from pred_live import INSTRUMENT_LIST
@@ -722,6 +721,10 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
             # Use the correct Gradio API path for newer versions
             img_path = best_detection["Path"]
 
+            # Hide path prefix for security/privacy
+            if img_path.startswith(BASE_PATH):
+                img_path = img_path.replace(BASE_PATH, BASE_HIDDEN_PATH)
+
             html_content += f"<div style='text-align: center; min-width: 200px;'>"
             html_content += f"<h4 style='margin: 5px 0; color: #666; font-size: 14px;'>{instrument}</h4>"
             html_content += f"<a href='/gradio_api/file={img_path}' target='_blank'>"
@@ -789,8 +792,8 @@ def load_latest(days_back: int, min_proba: float, min_stations: int):
 # -----------------------------
 def load_latest_bursts():
     """Load latest bursts with hardcoded settings: 3 days, conf ≥ 0.5, min 3 stations"""
-    df_all = concatenate_days(days_back=3, min_proba=0.5)
-    df_all = filter_by_min_stations(df_all, min_stations=3)
+    df_all = concatenate_days(days_back=3, min_proba=DEFAULT_MIN_PROBA)
+    df_all = filter_by_min_stations(df_all, min_stations=DEFAULT_MIN_STATIONS)
 
     if df_all.empty:
         return "<p>No recent bursts found with the specified criteria.</p>"
@@ -1005,4 +1008,4 @@ if __name__ == "__main__":
     # Small guard: ensure regex util available
     # (we import inside main to avoid global import if not run)
     demo = create_app()
-    demo.launch(allowed_paths=[BASE_PATH, "static"])
+    demo.launch(allowed_paths=[BASE_PATH, "static", BASE_HIDDEN_PATH])
