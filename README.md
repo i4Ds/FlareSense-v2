@@ -42,6 +42,8 @@ python pred_live.py
 
 The web app in `app.py` provides a user interface for uploading data, running predictions, and viewing results. It is built with Flask and integrates with the prediction models.
 
+To hide the complete path, we make a symlink between where the images are and where they are shown.
+
 ## Evaluation
 
 To reproduce our results, run the following command:

@@ -13,10 +13,10 @@ import gradio as gr
 # -----------------------------
 # CONFIG
 # -----------------------------
-BASE_PATH = os.path.join("/mnt/nas05/data01/vincenzo/ecallisto/burst_live_images")
+# Symbolic base path for data storage
+BASE_PATH = os.path.join("/srv/flaresense-data/burst_live_images")
 # Hidden path for UI links
 # Basically, a mounted version without the full filesystem path
-BASE_HIDDEN_PATH = os.path.join("/srv/flaresense-data/burst_live_images")
 TIMEGROUP_MINUTES = 15
 DEFAULT_MIN_PROBA = 0.5
 DEFAULT_MIN_STATIONS = 3
@@ -721,11 +721,7 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
             best_detection = instrument_data.iloc[0]  # highest confidence
 
             # Use the correct Gradio API path for newer versions
-            img_path = best_detection["Path"]
-
-            # Hide path prefix for security/privacy
-            if img_path.startswith(BASE_PATH):
-                img_path = img_path.replace(BASE_PATH, BASE_HIDDEN_PATH)
+            img_path: str = best_detection["Path"]
 
             html_content += f"<div style='text-align: center; min-width: 200px;'>"
             html_content += f"<h4 style='margin: 5px 0; color: #666; font-size: 14px;'>{instrument}</h4>"
@@ -1010,4 +1006,4 @@ if __name__ == "__main__":
     # Small guard: ensure regex util available
     # (we import inside main to avoid global import if not run)
     demo = create_app()
-    demo.launch(allowed_paths=[BASE_PATH, "static", BASE_HIDDEN_PATH])
+    demo.launch(allowed_paths=[BASE_PATH, "static"])
