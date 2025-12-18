@@ -376,7 +376,7 @@ def plot_all_data_with_ma():
         labels={"Day": "Date", "Count": "Bursts"},
     )
 
-    # Add 7-day moving average line
+    # Add 7-day moving average line (hidden from legend)
     fig.add_trace(
         go.Scatter(
             x=daily_counts["Day"],
@@ -385,6 +385,7 @@ def plot_all_data_with_ma():
             name="7-Day Moving Average",
             line=dict(color="red", width=3),
             yaxis="y2",
+            showlegend=False,
         )
     )
 
@@ -393,9 +394,7 @@ def plot_all_data_with_ma():
         hovermode="x unified",
         xaxis_title="Date",
         yaxis_title="Daily Burst Detections",
-        yaxis2=dict(
-            title="7-Day Moving Average", overlaying="y", side="right", showgrid=False
-        ),
+        yaxis2=dict(title="", overlaying="y", side="right", showgrid=False),
         font=dict(size=12),
         height=600,
         width=1600,
@@ -670,24 +669,41 @@ def update_gallery_for_selected_group(
 def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
     """
     Create HTML for scrollable burst groups with hover zoom functionality.
-    Each entry's header format: "Burst at [timestamp] seen by X antennas — Max conf: [value], Avg conf: [value]"
+    Each entry's header format: "[timestamp] — Avg conf: [value]%"
     """
     if df_all.empty:
         return "<p>No burst data available.</p>"
 
-    # Add CSS for hover zoom effect
+    # Add CSS for hover zoom effect with fixed z-index and smart positioning
     css_style = """
     <style>
+    .burst-image-container {
+        position: relative;
+        display: inline-block;
+    }
     .hover-zoom {
-        transition: transform 0.3s ease;
+        transition: transform 0.3s ease, z-index 0s;
         cursor: pointer;
+        position: relative;
     }
     .hover-zoom:hover {
         transform: scale(2.5);
-        z-index: 1000;
+        z-index: 10000 !important;
         position: relative;
         border: 2px solid #007bff !important;
         box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    }
+    /* First item in row - expand to the right */
+    .burst-image-container:first-child .hover-zoom:hover {
+        transform-origin: left center;
+    }
+    /* Last item in row - expand to the left */
+    .burst-image-container:last-child .hover-zoom:hover {
+        transform-origin: right center;
+    }
+    /* Middle items - expand from center */
+    .burst-image-container:not(:first-child):not(:last-child) .hover-zoom:hover {
+        transform-origin: center center;
     }
     </style>
     """
@@ -707,15 +723,15 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
         max_conf = group_df["Confidence"].max()
         avg_conf = group_df["Confidence"].mean()
 
-        # Create header with requested format
+        # Create header: datetime on top, avg conf below in smaller text
         burst_time = group_time.strftime("%Y-%m-%d %H:%M UTC")
-        header = f"Burst at {burst_time} seen by {station_count} antennas — Max conf: {max_conf:.1f}%, Avg conf: {avg_conf:.1f}%"
 
         html_content += f"<div style='margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 8px;'>"
-        html_content += f"<h3 style='color: #333; margin-top: 0;'>{header}</h3>"
+        html_content += f"<h3 style='color: #333; margin-top: 0; margin-bottom: 2px;'>{burst_time}</h3>"
+        html_content += f"<p style='color: #666; font-size: 0.9em; margin-top: 0; margin-bottom: 10px;'>Avg conf: {avg_conf:.1f}%</p>"
 
         # Group by instrument and show images
-        html_content += "<div style='display: flex; flex-wrap: wrap; gap: 15px;'>"
+        html_content += "<div style='display: flex; flex-wrap: wrap; gap: 15px; position: relative; z-index: 1;'>"
         for instrument in group_df["Instrument Location"].unique():
             instrument_data = group_df[group_df["Instrument Location"] == instrument]
             best_detection = instrument_data.iloc[0]  # highest confidence
@@ -723,7 +739,7 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
             # Use the correct Gradio API path for newer versions
             img_path: str = best_detection["Path"]
 
-            html_content += f"<div style='text-align: center; min-width: 200px;'>"
+            html_content += f"<div class='burst-image-container' style='text-align: center; min-width: 200px;'>"
             html_content += f"<h4 style='margin: 5px 0; color: #666; font-size: 14px;'>{instrument}</h4>"
             html_content += f"<a href='/gradio_api/file={img_path}' target='_blank'>"
             html_content += f"<img src='/gradio_api/file={img_path}' class='hover-zoom' style='max-width: 180px; max-height: 180px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;' alt='Burst detection' title='Click to open in new tab'>"
@@ -840,7 +856,9 @@ def create_app():
                 gr.Markdown("### Recent Solar Radio Burst Detections")
 
                 # Latest tab shows scrollable bursts with hardcoded settings
-                latest_bursts_html = gr.HTML()
+                latest_bursts_html = gr.HTML(
+                    value="<div style='text-align: center; padding: 40px;'><p style='font-size: 1.2em;'>⏳ Loading latest bursts...</p></div>"
+                )
 
                 # Load latest bursts on page load with fixed settings
                 demo.load(
@@ -882,16 +900,41 @@ def create_app():
             with gr.TabItem("🔎 Data Browser & Export"):
                 with gr.Row():
                     with gr.Column(scale=1):
-                        gr.Markdown("### Date Selection", elem_classes=["section-card"])
-                        date_text = gr.Textbox(
-                            label="Select Date:",
-                            value=today_date().strftime("%Y-%m-%d"),
-                            placeholder="e.g. 2025-09-01, 9.1.2025, today, yesterday",
+                        gr.Markdown(
+                            "### Date Range Selection", elem_classes=["section-card"]
                         )
+                        date_start = gr.Textbox(
+                            label="Start Date:",
+                            value=today_date().strftime("%Y-%m-%d"),
+                            placeholder="e.g. 2025-09-01, today, yesterday",
+                        )
+                        date_end = gr.Textbox(
+                            label="End Date:",
+                            value=today_date().strftime("%Y-%m-%d"),
+                            placeholder="e.g. 2025-09-05, today",
+                        )
+
+                        gr.Markdown("### Filters", elem_classes=["section-card"])
+                        confidence_slider = gr.Slider(
+                            minimum=0.1,
+                            maximum=0.9,
+                            value=0.5,
+                            step=0.1,
+                            label="Minimum Confidence",
+                        )
+                        min_stations_slider = gr.Slider(
+                            minimum=1,
+                            maximum=10,
+                            value=1,
+                            step=1,
+                            label="Minimum Stations",
+                        )
+
+                        search_btn = gr.Button("🔍 Search", variant="primary")
 
                         gr.Markdown("### Export", elem_classes=["section-card"])
                         export_btn = gr.Button(
-                            "📦 Download ZIP (Bursts + Images)", variant="primary"
+                            "📦 Download ZIP (Bursts + Images)", variant="secondary"
                         )
                         export_file = gr.File(
                             label="Download Export", interactive=False
@@ -908,90 +951,189 @@ def create_app():
 
                     with gr.Column(scale=2):
                         gr.Markdown(
-                            "### Bursts for Selected Date\n"
-                            "Shows all bursts with confidence ≥ 50% detected on the selected date. ",
+                            "### Bursts for Selected Date Range\n"
+                            "Shows bursts matching your filter criteria. ",
                             elem_classes=["section-card"],
                         )
-                        date_bursts_html = gr.HTML()
+                        date_bursts_html = gr.HTML(
+                            value="<div style='text-align: center; padding: 40px;'><p style='font-size: 1.2em;'>⏳ Loading...</p></div>"
+                        )
 
-                def load_date_bursts(date_text_val: str):
-                    """Load bursts for the selected date in the same format as Latest tab"""
-                    dt = parse_date_text(date_text_val)
-                    if not dt:
-                        return "<p>Invalid date format. Please try again.</p>"
+                def load_date_bursts(
+                    start_date_val: str,
+                    end_date_val: str,
+                    min_conf: float,
+                    min_stations: int,
+                ):
+                    """Load bursts for the selected date range with filters"""
+                    dt_start = parse_date_text(start_date_val)
+                    dt_end = parse_date_text(end_date_val)
 
-                    # Load data for the specific day
-                    df_day = load_image_paths_for_date(dt, min_proba=0.5)
+                    if not dt_start:
+                        return "<p>Invalid start date format. Please try again.</p>"
+                    if not dt_end:
+                        dt_end = dt_start  # Default to single day if end date invalid
 
-                    if df_day.empty:
-                        return f"<p>No bursts found for {dt.strftime('%Y-%m-%d')} with confidence ≥ 50%.</p>"
+                    # Ensure start <= end
+                    if dt_start > dt_end:
+                        dt_start, dt_end = dt_end, dt_start
 
-                    # Apply minimum stations filter (same as Latest tab)
-                    df_day["TimeGroup"] = df_day["Datetime"].dt.floor("15min")
+                    # Limit range to 30 days max
+                    max_days = 30
+                    if (dt_end - dt_start).days > max_days:
+                        return f"<p>Date range too large. Please select a range of {max_days} days or less.</p>"
+
+                    # Load data for each day in range
+                    all_dfs = []
+                    current_date = dt_start
+                    while current_date <= dt_end:
+                        df_day = load_image_paths_for_date(
+                            current_date, min_proba=min_conf
+                        )
+                        if not df_day.empty:
+                            all_dfs.append(df_day)
+                        current_date += timedelta(days=1)
+
+                    if not all_dfs:
+                        date_range_str = (
+                            f"{dt_start.strftime('%Y-%m-%d')}"
+                            if dt_start == dt_end
+                            else f"{dt_start.strftime('%Y-%m-%d')} to {dt_end.strftime('%Y-%m-%d')}"
+                        )
+                        return f"<p>No bursts found for {date_range_str} with confidence ≥ {min_conf*100:.0f}%.</p>"
+
+                    df_all = pd.concat(all_dfs, ignore_index=True)
+
+                    # Apply minimum stations filter
+                    df_all["TimeGroup"] = df_all["Datetime"].dt.floor("15min")
                     station_counts = (
-                        df_day.groupby("TimeGroup")["Instrument Location"]
+                        df_all.groupby("TimeGroup")["Instrument Location"]
                         .nunique()
                         .reset_index()
                     )
                     station_counts.columns = ["TimeGroup", "station_count"]
-                    valid_groups = station_counts[station_counts["station_count"] >= 1][
-                        "TimeGroup"
-                    ]
-                    df_filtered = df_day[df_day["TimeGroup"].isin(valid_groups)]
+                    valid_groups = station_counts[
+                        station_counts["station_count"] >= min_stations
+                    ]["TimeGroup"]
+                    df_filtered = df_all[df_all["TimeGroup"].isin(valid_groups)]
 
                     if df_filtered.empty:
-                        return f"<p>No bursts found for {dt.strftime('%Y-%m-%d')} with minimum 1 stations and confidence ≥ 50%.</p>"
+                        date_range_str = (
+                            f"{dt_start.strftime('%Y-%m-%d')}"
+                            if dt_start == dt_end
+                            else f"{dt_start.strftime('%Y-%m-%d')} to {dt_end.strftime('%Y-%m-%d')}"
+                        )
+                        return f"<p>No bursts found for {date_range_str} with minimum {min_stations} station(s) and confidence ≥ {min_conf*100:.0f}%.</p>"
 
                     return create_scrollable_burst_groups(df_filtered)
 
-                def export_date_data(date_text_val: str):
-                    """Export ZIP with bursts and images for the selected date"""
-                    dt = parse_date_text(date_text_val)
-                    if not dt:
+                def export_date_data(
+                    start_date_val: str,
+                    end_date_val: str,
+                    min_conf: float,
+                    min_stations: int,
+                ):
+                    """Export ZIP with bursts and images for the selected date range"""
+                    dt_start = parse_date_text(start_date_val)
+                    dt_end = parse_date_text(end_date_val)
+
+                    if not dt_start:
+                        return None
+                    if not dt_end:
+                        dt_end = dt_start
+
+                    # Ensure start <= end
+                    if dt_start > dt_end:
+                        dt_start, dt_end = dt_end, dt_start
+
+                    # Limit range to 30 days
+                    if (dt_end - dt_start).days > 30:
                         return None
 
-                    # Load data for the specific day
-                    df_day = load_image_paths_for_date(dt, min_proba=0.5)
+                    # Load data for each day in range
+                    all_dfs = []
+                    current_date = dt_start
+                    while current_date <= dt_end:
+                        df_day = load_image_paths_for_date(
+                            current_date, min_proba=min_conf
+                        )
+                        if not df_day.empty:
+                            all_dfs.append(df_day)
+                        current_date += timedelta(days=1)
 
-                    if df_day.empty:
+                    if not all_dfs:
                         return None
 
-                    # Apply minimum stations filter (same as Latest tab)
-                    df_day["TimeGroup"] = df_day["Datetime"].dt.floor("15min")
-                    station_counts = (
-                        df_day.groupby("TimeGroup")["Instrument Location"]
-                        .nunique()
-                        .reset_index()
+                    df_all = pd.concat(all_dfs, ignore_index=True)
+                    df_all = filter_by_min_stations(df_all, min_stations)
+
+                    if df_all.empty:
+                        return None
+
+                    # Create ZIP export
+                    tmp_dir = tempfile.mkdtemp()
+                    date_str = (
+                        f"{dt_start.strftime('%Y%m%d')}_to_{dt_end.strftime('%Y%m%d')}"
+                        if dt_start != dt_end
+                        else dt_start.strftime("%Y%m%d")
                     )
-                    station_counts.columns = ["TimeGroup", "station_count"]
-                    valid_groups = station_counts[station_counts["station_count"] >= 3][
-                        "TimeGroup"
-                    ]
-                    df_filtered = df_day[df_day["TimeGroup"].isin(valid_groups)]
+                    zip_path = os.path.join(
+                        tmp_dir, f"FlareSense_Export_{date_str}.zip"
+                    )
 
-                    if df_filtered.empty:
-                        return None
+                    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+                        # CSV (remove Path column)
+                        csv_data = df_all.drop(columns=["TimeGroup", "Path"]).round(2)
+                        csv_path = os.path.join(tmp_dir, f"bursts_{date_str}.csv")
+                        csv_data.to_csv(csv_path, index=False)
+                        zipf.write(csv_path, os.path.basename(csv_path))
 
-                    return create_zip_export_for_date(dt, min_proba=0.5, min_stations=3)
+                        # Images
+                        for _, row in df_all.iterrows():
+                            img_path = row["Path"]
+                            if os.path.exists(img_path):
+                                burst_time = row["Datetime"].strftime("%H-%M-%S")
+                                burst_date = row["Datetime"].strftime("%Y-%m-%d")
+                                confidence = row["Confidence"]
+                                instrument = row["Instrument Location"]
+                                filename = f"{burst_date}_{burst_time}_{instrument}_{confidence:.1f}pct.png"
+                                zipf.write(img_path, f"images/{filename}")
+
+                    return zip_path
 
                 # Initial load
                 demo.load(
                     fn=load_date_bursts,
-                    inputs=[date_text],
+                    inputs=[
+                        date_start,
+                        date_end,
+                        confidence_slider,
+                        min_stations_slider,
+                    ],
                     outputs=[date_bursts_html],
                 )
 
-                # Update when date changes
-                date_text.change(
+                # Search button click
+                search_btn.click(
                     fn=load_date_bursts,
-                    inputs=[date_text],
+                    inputs=[
+                        date_start,
+                        date_end,
+                        confidence_slider,
+                        min_stations_slider,
+                    ],
                     outputs=[date_bursts_html],
                 )
 
                 # Export functionality
                 export_btn.click(
                     fn=export_date_data,
-                    inputs=[date_text],
+                    inputs=[
+                        date_start,
+                        date_end,
+                        confidence_slider,
+                        min_stations_slider,
+                    ],
                     outputs=[export_file],
                 )
 
