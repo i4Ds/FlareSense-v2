@@ -908,7 +908,8 @@ def create_app():
 
                     with gr.Column(scale=2):
                         gr.Markdown(
-                            "### Bursts for Selected Date",
+                            "### Bursts for Selected Date\n"
+                            "Shows all bursts with confidence ≥ 50% detected on the selected date. ",
                             elem_classes=["section-card"],
                         )
                         date_bursts_html = gr.HTML()
@@ -933,13 +934,13 @@ def create_app():
                         .reset_index()
                     )
                     station_counts.columns = ["TimeGroup", "station_count"]
-                    valid_groups = station_counts[station_counts["station_count"] >= 3][
+                    valid_groups = station_counts[station_counts["station_count"] >= 1][
                         "TimeGroup"
                     ]
                     df_filtered = df_day[df_day["TimeGroup"].isin(valid_groups)]
 
                     if df_filtered.empty:
-                        return f"<p>No bursts found for {dt.strftime('%Y-%m-%d')} with minimum 3 stations and confidence ≥ 50%.</p>"
+                        return f"<p>No bursts found for {dt.strftime('%Y-%m-%d')} with minimum 1 stations and confidence ≥ 50%.</p>"
 
                     return create_scrollable_burst_groups(df_filtered)
 
