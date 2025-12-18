@@ -394,7 +394,13 @@ def plot_all_data_with_ma():
         hovermode="x unified",
         xaxis_title="Date",
         yaxis_title="Daily Burst Detections",
-        yaxis2=dict(title="", overlaying="y", side="right", showgrid=False),
+        yaxis2=dict(
+            title="",
+            overlaying="y",
+            side="right",
+            showgrid=False,
+            showticklabels=False,
+        ),
         font=dict(size=12),
         height=600,
         width=1600,
@@ -693,12 +699,16 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
         border: 2px solid #007bff !important;
         box-shadow: 0 8px 16px rgba(0,0,0,0.3);
     }
-    /* First item in row - expand to the right */
-    .burst-image-container:first-child .hover-zoom:hover {
+    /* Single item - expand to the right */
+    .burst-image-container:only-child .hover-zoom:hover {
         transform-origin: left center;
     }
-    /* Last item in row - expand to the left */
-    .burst-image-container:last-child .hover-zoom:hover {
+    /* First item in row (but not only child) - expand to the right */
+    .burst-image-container:first-child:not(:only-child) .hover-zoom:hover {
+        transform-origin: left center;
+    }
+    /* Last item in row (but not only child) - expand to the left */
+    .burst-image-container:last-child:not(:only-child) .hover-zoom:hover {
         transform-origin: right center;
     }
     /* Middle items - expand from center */
