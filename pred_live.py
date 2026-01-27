@@ -207,7 +207,10 @@ def predict_from_to(start_datetime, end_datetime, model, config, base_path=None)
         for _, row in df_bursts.iterrows():
             # Create figure
             data = get_ecallisto_data(
-                row["datetime"], row["datetime"] + timedelta(minutes=15), row["antenna"]
+                row["datetime"],
+                row["datetime"] + timedelta(minutes=15),
+                row["antenna"],
+                download_from_local=True,
             )[row["antenna"]]
             fig = plot_spectrogram(subtract_constant_background(data).clip(0, 16))
 
