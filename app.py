@@ -9,14 +9,13 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import gradio as gr
+from paths import NAS_BURST_IMAGES_PATH, SERVER_BURST_IMAGES_PATH
 
 # -----------------------------
 # CONFIG
 # -----------------------------
-# Symbolic base path for data storage
-BASE_PATH = os.path.join("/srv/flaresense-data/burst_live_images")
-# Hidden path for UI links
-# Basically, a mounted version without the full filesystem path
+# The web app serves images through the server-side symlink path.
+BASE_PATH = SERVER_BURST_IMAGES_PATH
 TIMEGROUP_MINUTES = 15
 DEFAULT_MIN_PROBA = 0.5
 DEFAULT_MIN_STATIONS = 3
@@ -1159,4 +1158,4 @@ if __name__ == "__main__":
     # Small guard: ensure regex util available
     # (we import inside main to avoid global import if not run)
     demo = create_app()
-    demo.launch(allowed_paths=[BASE_PATH, "static"])
+    demo.launch(allowed_paths=[BASE_PATH, NAS_BURST_IMAGES_PATH, "static"])

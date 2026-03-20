@@ -26,6 +26,7 @@ import numpy as np
 import tempfile
 import shutil
 import time
+from paths import NAS_BURST_IMAGES_PATH
 
 # Model Parameters
 REPO_ID = "i4ds/flaresense-v2"
@@ -161,7 +162,7 @@ def prepare_dataloaders(ds: EcallistoDatasetBinary, batch_size: int):
 
 def predict_from_to(start_datetime, end_datetime, model, config, base_path=None):
     if base_path is None:
-        base_path = BASE_PATH
+        base_path = NAS_BURST_IMAGES_PATH
     # Temporary directory for parquet data
     tmp_dir = tempfile.mkdtemp()
 
@@ -234,8 +235,6 @@ def predict_from_to(start_datetime, end_datetime, model, config, base_path=None)
 
 
 if __name__ == "__main__":
-    from app import BASE_PATH
-
     checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 

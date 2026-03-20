@@ -14,14 +14,14 @@ from pred_live import (
     MODEL_FILENAME,
     CONFIG_PATH,
 )
-from app import BASE_PATH
+from paths import NAS_BURST_IMAGES_PATH
 
 # Model Parameters
 torch.set_float32_matmul_precision("high")
 
 if __name__ == "__main__":
-    if not os.path.exists(BASE_PATH):
-        os.makedirs(BASE_PATH)
+    if not os.path.exists(NAS_BURST_IMAGES_PATH):
+        os.makedirs(NAS_BURST_IMAGES_PATH)
 
     checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -38,12 +38,12 @@ if __name__ == "__main__":
     model.to(device)
 
     # Predict between two ranges
-    start_datetime = datetime(2025, 12, 7, 0, 0, 0, tzinfo=timezone.utc)
-    end_datetime = datetime(2026, 1, 27, 12, 0, 0, tzinfo=timezone.utc)
+    start_datetime = datetime(2026, 3, 17, 0, 0, 0, tzinfo=timezone.utc)
+    end_datetime = datetime(2026, 3, 20, 12, 0, 0, tzinfo=timezone.utc)
 
     # Split it up into two-hour steps
     for start_time in tqdm(
         pd.date_range(start_datetime, end_datetime, freq="2h", inclusive="both")
     ):
         end_time = start_time + timedelta(hours=2)
-        predict_from_to(start_time, end_time, model, config, BASE_PATH)
+        predict_from_to(start_time, end_time, model, config, NAS_BURST_IMAGES_PATH)

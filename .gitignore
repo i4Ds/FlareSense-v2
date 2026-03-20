@@ -171,3 +171,4 @@ burst_plots/*
 output_burst_images/*
 *.pth
 tmp/*
+paths.py
