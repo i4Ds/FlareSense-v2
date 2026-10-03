@@ -167,6 +167,7 @@ FlareSense-v2/**/*.ckpt
 original_labels/*
 *.csv
 flaresense-data/*
+data/
 burst_plots/*
 output_burst_images/*
 *.pth

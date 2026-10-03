@@ -1,0 +1,5 @@
+services:
+  web:
+    volumes:
+      # Host directory of burst PNGs. Defaults to ./data/burst_images.
+      - ${FLARESENSE_HOST_IMAGE_DIR:-./data/burst_images}:/data/burst_images

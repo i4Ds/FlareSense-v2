@@ -1,5 +1,4 @@
 import os
-import glob
 import zipfile
 import tempfile
 from datetime import datetime, timedelta
@@ -9,19 +8,23 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import gradio as gr
-from paths import NAS_BURST_IMAGES_PATH, SERVER_BURST_IMAGES_PATH
+from bursts import (
+    LATEST_DAYS,
+    LATEST_MIN_PROBA,
+    LATEST_MIN_STATIONS,
+    rows_for_day,
+)
+from instruments import INSTRUMENT_LIST
+from settings import image_dir, predict_image_dir
 
 # -----------------------------
 # CONFIG
 # -----------------------------
-# The web app serves images through the server-side symlink path.
-BASE_PATH = SERVER_BURST_IMAGES_PATH
+# The web app serves images from this directory (env, paths.py, or ./data).
+BASE_PATH = image_dir()
 TIMEGROUP_MINUTES = 15
-DEFAULT_MIN_PROBA = 0.5
-DEFAULT_MIN_STATIONS = 3
-
-# Your existing list of valid instruments
-from pred_live import INSTRUMENT_LIST
+DEFAULT_MIN_PROBA = LATEST_MIN_PROBA
+DEFAULT_MIN_STATIONS = LATEST_MIN_STATIONS
 
 
 # -----------------------------
@@ -97,30 +100,16 @@ def load_image_paths_for_date(date_obj: datetime, min_proba: float) -> pd.DataFr
     Scan directory for one day. Returns DataFrame:
     ['Datetime','Instrument Location','Confidence','Path','TimeGroup'].
     """
-    year, month, day = ymd_from_date(date_obj)
-    search_path = os.path.join(BASE_PATH, year, month, day, "*", "*")
-
     table_data = []
-    for f in glob.glob(search_path):
-        try:
-            base = os.path.basename(f)
-            parts = base.split("_")
-            proba = float(parts[0])
-            if proba < min_proba:
-                continue
-
-            antenna = "_".join(parts[1:-2])
-            dt_str = parts[-2] + " " + parts[-1].replace(".png", "")
-            dt = datetime.strptime(dt_str, "%d-%m-%Y %H-%M-%S")
-
-            # filter invalid instruments early
-            if antenna not in INSTRUMENT_LIST:
-                continue
-
-            table_data.append([dt, antenna, proba, f])
-        except (ValueError, IndexError):
-            # malformed filenames are ignored
-            continue
+    for row in rows_for_day(BASE_PATH, date_obj, min_proba, INSTRUMENT_LIST):
+        table_data.append(
+            [
+                row["Datetime"],
+                row["Instrument Location"],
+                row["Confidence"],
+                row["Path"],
+            ]
+        )
 
     if not table_data:
         return pd.DataFrame(
@@ -736,8 +725,12 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
         burst_time = group_time.strftime("%Y-%m-%d %H:%M UTC")
 
         html_content += f"<div style='margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 8px;'>"
+        station_word = "station" if station_count == 1 else "stations"
         html_content += f"<h3 style='color: #333; margin-top: 0; margin-bottom: 2px;'>{burst_time}</h3>"
-        html_content += f"<p style='color: #666; font-size: 0.9em; margin-top: 0; margin-bottom: 10px;'>Avg conf: {avg_conf:.1f}%</p>"
+        html_content += (
+            f"<p style='color: #666; font-size: 0.9em; margin-top: 0; margin-bottom: 10px;'>"
+            f"{station_count} {station_word} · avg conf {avg_conf:.1f}%</p>"
+        )
 
         # Group by instrument and show images
         html_content += "<div style='display: flex; flex-wrap: wrap; gap: 15px; position: relative; z-index: 1;'>"
@@ -814,12 +807,15 @@ def load_latest(days_back: int, min_proba: float, min_stations: int):
 # BUILD APP
 # -----------------------------
 def load_latest_bursts():
-    """Load latest bursts with hardcoded settings: 3 days, conf ≥ 0.5, min 3 stations"""
-    df_all = concatenate_days(days_back=3, min_proba=DEFAULT_MIN_PROBA)
-    df_all = filter_by_min_stations(df_all, min_stations=DEFAULT_MIN_STATIONS)
+    """Last few days, confidence at least 50%. One station is enough to list a flare."""
+    df_all = concatenate_days(days_back=LATEST_DAYS, min_proba=LATEST_MIN_PROBA)
+    df_all = filter_by_min_stations(df_all, min_stations=LATEST_MIN_STATIONS)
 
     if df_all.empty:
-        return "<p>No recent bursts found with the specified criteria.</p>"
+        return (
+            f"<p>No bursts in the last {LATEST_DAYS} days "
+            f"with confidence at least {LATEST_MIN_PROBA * 100:.0f}%.</p>"
+        )
 
     # Create scrollable burst groups with the SAME format that was working before
     html_content = create_scrollable_burst_groups(df_all)
@@ -827,7 +823,7 @@ def load_latest_bursts():
     # Add explanatory note
     note = """
     <div style='margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #666;'>
-        <em>Plots show last 3 days, with confidence ≥ 0.5 and at least 3 stations.</em>
+        <em>Plots show the last 3 days with confidence at least 50%. A time is listed when one station saw it.</em>
     </div>
     """
 
@@ -1158,4 +1154,8 @@ if __name__ == "__main__":
     # Small guard: ensure regex util available
     # (we import inside main to avoid global import if not run)
     demo = create_app()
-    demo.launch(allowed_paths=[BASE_PATH, NAS_BURST_IMAGES_PATH, "static"])
+    demo.launch(
+        server_name=os.environ.get("GRADIO_SERVER_NAME", "127.0.0.1"),
+        server_port=int(os.environ.get("GRADIO_SERVER_PORT", "7860")),
+        allowed_paths=[BASE_PATH, predict_image_dir(), "static"],
+    )

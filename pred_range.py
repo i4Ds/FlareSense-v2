@@ -14,14 +14,15 @@ from pred_live import (
     MODEL_FILENAME,
     CONFIG_PATH,
 )
-from paths import NAS_BURST_IMAGES_PATH
+from settings import predict_image_dir
 
 # Model Parameters
 torch.set_float32_matmul_precision("high")
 
 if __name__ == "__main__":
-    if not os.path.exists(NAS_BURST_IMAGES_PATH):
-        os.makedirs(NAS_BURST_IMAGES_PATH)
+    out_dir = predict_image_dir()
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
 
     checkpoint_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -46,4 +47,4 @@ if __name__ == "__main__":
         pd.date_range(start_datetime, end_datetime, freq="2h", inclusive="both")
     ):
         end_time = start_time + timedelta(hours=2)
-        predict_from_to(start_time, end_time, model, config, NAS_BURST_IMAGES_PATH)
+        predict_from_to(start_time, end_time, model, config, out_dir)

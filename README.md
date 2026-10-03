@@ -40,9 +40,27 @@ python pred_live.py
 
 ## Web App
 
-The web app in `app.py` provides a user interface for uploading data, running predictions, and viewing results. It is built with Flask and integrates with the prediction models.
+The site is a Gradio app (`app.py`). It lists burst images written by `pred_live.py`. It does not run the model itself.
 
-To hide the complete path, we make a symlink between where the images are and where they are shown.
+Dev and prod use Docker Compose, the same way as heliotime-v2:
+
+```sh
+./du.sh dev deploy
+```
+
+The dev site is at <http://localhost:7860/>. It reads `./data/burst_images` unless `FLARESENSE_HOST_IMAGE_DIR` is set.
+
+Production:
+
+```sh
+# .env
+FLARESENSE_HOST_IMAGE_DIR=/path/to/burst/images
+WEB_PORT=7860
+
+./du.sh prod deploy
+```
+
+See [deployment](docs/deploy.md). A bare `python app.py` still works: set `FLARESENSE_IMAGE_DIR`, or keep the gitignored `paths.py` the server already uses.
 
 ## Evaluation
 
@@ -57,31 +75,21 @@ python main.py --config configs/best_v2.yml
 All notebooks can be found in the `_notebooks` directory. They provide
 exploratory data analysis, model investigations, and visualizations.
 
-## Deployment
+## Current server process
 
-FlareSense is deployed as Linux systemd services for production use:
+[flaresense.ch](https://flaresense.ch/) still runs as systemd services until it is switched to `./du.sh prod deploy`:
 
-- **flaresense_app.service**: Manages the web app (`app.py`) for user-facing interactions.
-- **flaresense.service**: Handles continuous prediction tasks.
-
-## Service Management
-
-If FlareSense is deployed as systemd services, you can inspect the logs with:
+- **flaresense_app.service** — `app.py`
+- **flaresense.service** — `pred_live.py` (writes the PNGs the site reads)
 
 ```bash
-sudo journalctl -u flaresense_app.service  # For web app logs
-sudo journalctl -u flaresense.service      # For prediction service logs
-```
-
-After modifying the service files, redeploy with:
-
-```bash
+sudo journalctl -u flaresense_app.service
+sudo journalctl -u flaresense.service
 sudo systemctl restart flaresense_app.service
-sudo systemctl restart flaresense.service
-sudo systemctl daemon-reload
 ```
 
-The .serice-file can be found here: /etc/systemd/system/flaresense_app.service
+The unit files are on the server at `/etc/systemd/system/`. Image paths for that process live in gitignored `paths.py`, or in `FLARESENSE_IMAGE_DIR` / `FLARESENSE_PREDICT_DIR`.
+
 ---
 
 This repository is provided for reference without any warranty.

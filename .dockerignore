@@ -1,0 +1,15 @@
+.git
+.venv
+venv
+data
+_notebooks
+_archive
+XAI
+wandb
+logs
+lightning_logs
+**/__pycache__
+**/*.pyc
+**/*.ckpt
+**/*.pth
+*.csv

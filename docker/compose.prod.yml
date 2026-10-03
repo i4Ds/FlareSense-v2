@@ -1,0 +1,6 @@
+services:
+  web:
+    restart: unless-stopped
+    volumes:
+      # Read-only: the predictor on the host writes this directory.
+      - ${FLARESENSE_HOST_IMAGE_DIR:?Set FLARESENSE_HOST_IMAGE_DIR to the host directory of burst PNGs}:/data/burst_images:ro

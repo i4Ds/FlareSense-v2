@@ -1,0 +1,6 @@
+gradio==5.8.0
+requests==2.32.3
+# 2.11+ emits JSON Schema that gradio_client 1.5.1 cannot read, and the site fails to start.
+pydantic==2.10.6
+pandas==2.2.3
+plotly==5.24.1

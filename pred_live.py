@@ -26,7 +26,8 @@ import numpy as np
 import tempfile
 import shutil
 import time
-from paths import NAS_BURST_IMAGES_PATH
+from instruments import INSTRUMENT_LIST
+from settings import predict_image_dir
 
 # Model Parameters
 REPO_ID = "i4ds/flaresense-v2"
@@ -34,50 +35,6 @@ MODEL_FILENAME = "model.ckpt"
 CONFIG_PATH = "configs/best_v2.yml"
 T = 0.4974  # Temperature parameter
 torch.set_float32_matmul_precision("high")
-
-
-# Parameters
-INSTRUMENT_LIST = [
-    "ALASKA-ANCHORAGE_91",
-    "ALASKA-COHOE_63",
-    "ALASKA-HAARP_62",
-    "ALGERIA-CRAAG_59",
-    "ALMATY_59",
-    "AUSTRIA-UNIGRAZ_01",
-    "Australia-ASSA_57",
-    "Australia-ASSA_63",
-    "BIR_01",
-    "EGYPT-Alexandria_02",
-    "EGYPT-SpaceAgency_01",
-    "GERMANY-DLR_63",
-    "POLAND-BALDY_62",
-    "GLASGOW_01",
-    "GREENLAND_62",
-    "HUMAIN_59",
-    "HURBANOVO_59",
-    "INDIA-GAURI_02",
-    "INDIA-OOTY_02",
-    "INDIA-UDAIPUR_03",
-    "INDONESIA_59",
-    "ITALY-Strassolt_01",
-    "KASI_59",
-    "MEXART_59",
-    "MEXICO-FCFM-UNACH_62",
-    "MEXICO-LANCE-B_62",
-    "MONGOLIA-UB_01",
-    "MRO_59",
-    "MRO_61",
-    "Malaysia-Banting_01",
-    "NORWAY-EGERSUND_01",
-    "ROMANIA_01",
-    "ROSWELL-NM_59",
-    "SRI-Lanka_59",
-    "SSRT_59",
-    "SWISS-IRSOL_01",
-    "SWISS-Landschlacht_62",
-    "TRIEST_57",
-    "UZBEKISTAN_01",
-]
 
 
 def sigmoid(x, T=T):
@@ -162,7 +119,7 @@ def prepare_dataloaders(ds: EcallistoDatasetBinary, batch_size: int):
 
 def predict_from_to(start_datetime, end_datetime, model, config, base_path=None):
     if base_path is None:
-        base_path = NAS_BURST_IMAGES_PATH
+        base_path = predict_image_dir()
     # Temporary directory for parquet data
     tmp_dir = tempfile.mkdtemp()
 
