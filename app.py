@@ -1,3 +1,4 @@
+import html
 import os
 import glob
 import json
@@ -23,6 +24,8 @@ BASE_PATH = SERVER_BURST_IMAGES_PATH
 TIMEGROUP_MINUTES = 15
 DEFAULT_MIN_PROBA = 0.5
 DEFAULT_MIN_STATIONS = 3
+# Intensity rank looks past a single day. 60 matches the Trends window.
+INTENSITY_LOOKBACK_DAYS = 60
 # Public site that already serves the saved spectrograms. Used only when this
 # machine has no local burst archive. Set FLARESENSE_REMOTE_API= to disable.
 REMOTE_ORIGIN = os.environ.get("FLARESENSE_REMOTE_API", "https://flaresense.ch").rstrip("/")
@@ -34,6 +37,12 @@ REMOTE_ERROR: Optional[str] = None
 
 # Your existing list of valid instruments
 from pred_live import INSTRUMENT_LIST
+from burst_query import (
+    rank_bursts_by_intensity,
+    select_bursts_by_intensity,
+    stations_for_place,
+    filter_by_place,
+)
 
 
 # -----------------------------
@@ -1072,6 +1081,96 @@ def load_latest(days_back: int, min_proba: float, min_stations: int):
     )
 
 
+def intensity_catalog(min_proba: float) -> pd.DataFrame:
+    """Rows that can be ranked by strength.
+
+    The saved archive when this machine has images, otherwise the last
+    INTENSITY_LOOKBACK_DAYS on flaresense.ch. Dates are not the query.
+    """
+    if local_archive_has_images():
+        return local_all_burst_frame(min_proba)
+    end = datetime(today_date().year, today_date().month, today_date().day)
+    start = end - timedelta(days=INTENSITY_LOOKBACK_DAYS - 1)
+    return remote_burst_frame(start, end, min_proba)
+
+
+def intensity_source_note() -> str:
+    if local_archive_has_images():
+        return "the saved archive"
+    return f"the last {INTENSITY_LOOKBACK_DAYS} days on flaresense.ch"
+
+
+def place_mismatch_message(place: str) -> Optional[str]:
+    """HTML when `place` matches no station name. None when it does, or is empty."""
+    place_text = (place or "").strip()
+    if not place_text or stations_for_place(INSTRUMENT_LIST, place_text):
+        return None
+    safe = html.escape(place_text)
+    return (
+        f"<p>No station name contains <b>{safe}</b>. "
+        "Try a country written in the station name, such as Australia, "
+        "or a station such as TRIEST_57.</p>"
+    )
+
+
+def create_intensity_ranking(
+    ranked: pd.DataFrame,
+    place: str,
+    total: int,
+    source_note: str,
+) -> str:
+    """HTML list of detections, strongest first, not grouped by time."""
+    mismatch = place_mismatch_message(place)
+    if mismatch:
+        return mismatch
+    place_text = (place or "").strip()
+    stations = stations_for_place(INSTRUMENT_LIST, place_text)
+    where = html.escape(", ".join(stations)) if place_text else "every station"
+    if ranked.empty:
+        return (
+            f"<p>No bursts at {where} in {html.escape(source_note)} "
+            "for this confidence and station count.</p>"
+        )
+
+    html_content = """
+    <style>
+    .hover-zoom { transition: transform 0.3s ease; cursor: pointer; position: relative; }
+    .hover-zoom:hover {
+        transform: scale(2.5);
+        z-index: 10000 !important;
+        transform-origin: left center;
+        border: 2px solid #007bff !important;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    }
+    </style>
+    """
+    html_content += (
+        f"<div class='fs-note'><em>Strongest {len(ranked)} of {total} "
+        f"at {where}, from {html.escape(source_note)}. "
+        "Ordered by the detection confidence in the filename, highest first. "
+        "That score is not a radio flux.</em></div>"
+    )
+    for rank, (_, row) in enumerate(ranked.iterrows(), start=1):
+        when = pd.to_datetime(row["Datetime"]).strftime("%Y-%m-%d %H:%M UTC")
+        station = html.escape(str(row["Instrument Location"]))
+        src = image_src(str(row["Path"]))
+        html_content += "<div class='fs-group' style='display:flex; gap:16px; align-items:center;'>"
+        html_content += (
+            f"<div style='min-width:220px;'>"
+            f"<h3 class='fs-title' style='margin:0;'>#{rank} · {row['Confidence']:.1f}%</h3>"
+            f"<p class='fs-muted' style='margin:4px 0;'>{station}</p>"
+            f"<p class='fs-faint' style='margin:0;'>{when}</p>"
+            f"</div>"
+        )
+        html_content += (
+            f"<a href='{src}' target='_blank'>"
+            f"<img src='{src}' class='hover-zoom fs-thumb' "
+            f"style='max-width:220px; max-height:160px;' alt='Burst detection'>"
+            f"</a></div>"
+        )
+    return html_content
+
+
 # -----------------------------
 # BUILD APP
 # -----------------------------
@@ -1254,6 +1353,29 @@ def create_app():
                             step=1,
                             label="Minimum Stations",
                         )
+                        order_mode = gr.Radio(
+                            choices=["By time", "By intensity"],
+                            value="By time",
+                            label="Select by",
+                        )
+                        place_box = gr.Textbox(
+                            label="Place or station",
+                            placeholder="Australia",
+                        )
+                        top_n = gr.Slider(
+                            minimum=1,
+                            maximum=30,
+                            value=10,
+                            step=1,
+                            label="How many strongest",
+                            visible=False,
+                        )
+                        intensity_hint = gr.Markdown(
+                            "By intensity ignores the dates above. It ranks the "
+                            f"detection confidence across {intensity_source_note()}. "
+                            "Australia matches Australia-ASSA_57 and Australia-ASSA_63.",
+                            visible=False,
+                        )
 
                         search_btn = gr.Button("🔍 Search", variant="primary")
 
@@ -1276,8 +1398,10 @@ def create_app():
 
                     with gr.Column(scale=2):
                         gr.Markdown(
-                            "### Bursts for Selected Date Range\n"
-                            "Shows bursts matching your filter criteria. ",
+                            "### Bursts\n"
+                            "By time: newest group in the date range first. "
+                            "By intensity: strongest detections for a place, "
+                            "not grouped by time.",
                             elem_classes=["section-card"],
                         )
                         date_bursts_html = gr.HTML(
@@ -1289,8 +1413,30 @@ def create_app():
                     end_date_val: str,
                     min_conf: float,
                     min_stations: int,
+                    order_mode: str,
+                    place: str,
+                    top_n: float,
                 ):
-                    """Load bursts for the selected date range with filters"""
+                    """Load bursts by date, or rank them by detection confidence."""
+                    if order_mode == "By intensity":
+                        catalog = intensity_catalog(min_conf)
+                        if (
+                            catalog.empty
+                            and REMOTE_ERROR
+                            and not local_archive_has_images()
+                        ):
+                            return (
+                                "<p>Could not read burst images from flaresense.ch: "
+                                f"{html.escape(REMOTE_ERROR)}</p>"
+                            )
+                        ranked = rank_bursts_by_intensity(
+                            catalog, place=place or "", min_stations=int(min_stations)
+                        )
+                        shown = ranked.head(max(1, int(top_n)))
+                        return create_intensity_ranking(
+                            shown, place or "", len(ranked), intensity_source_note()
+                        )
+
                     dt_start = parse_date_text(start_date_val)
                     dt_end = parse_date_text(end_date_val)
 
@@ -1328,6 +1474,16 @@ def create_app():
                         return f"<p>No bursts found for {date_range_str} with confidence ≥ {min_conf:.0f}%.</p>"
 
                     df_all = pd.concat(all_dfs, ignore_index=True)
+                    mismatch = place_mismatch_message(place or "")
+                    if mismatch:
+                        return mismatch
+                    df_all = filter_by_place(df_all, place or "")
+                    if df_all.empty:
+                        return (
+                            "<p>No bursts for "
+                            f"{html.escape((place or '').strip() or 'that range')} "
+                            f"with confidence ≥ {min_conf:.0f}%.</p>"
+                        )
 
                     # Apply minimum stations filter
                     df_all["TimeGroup"] = df_all["Datetime"].dt.floor("15min")
@@ -1357,51 +1513,71 @@ def create_app():
                     end_date_val: str,
                     min_conf: float,
                     min_stations: int,
+                    order_mode: str,
+                    place: str,
+                    top_n: float,
                 ):
-                    """Export ZIP with bursts and images for the selected date range"""
-                    dt_start = parse_date_text(start_date_val)
-                    dt_end = parse_date_text(end_date_val)
-
-                    if not dt_start:
-                        return None
-                    if not dt_end:
-                        dt_end = dt_start
-
-                    # Ensure start <= end
-                    if dt_start > dt_end:
-                        dt_start, dt_end = dt_end, dt_start
-
-                    # Limit range to 30 days
-                    if (dt_end - dt_start).days > 30:
-                        return None
-
-                    # Load data for each day in range
-                    all_dfs = []
-                    current_date = dt_start
-                    while current_date <= dt_end:
-                        df_day = load_image_paths_for_date(
-                            current_date, min_proba=min_conf
+                    """Export ZIP with bursts and images for the current selection."""
+                    if order_mode == "By intensity":
+                        catalog = intensity_catalog(min_conf)
+                        df_all = select_bursts_by_intensity(
+                            catalog,
+                            place=place or "",
+                            n=int(top_n),
+                            min_stations=int(min_stations),
                         )
-                        if not df_day.empty:
-                            all_dfs.append(df_day)
-                        current_date += timedelta(days=1)
+                        if df_all.empty:
+                            return None
+                        slug = re.sub(r"[^A-Za-z0-9]+", "-", (place or "all").strip())
+                        date_str = f"intensity_{slug.strip('-') or 'all'}"
+                    else:
+                        dt_start = parse_date_text(start_date_val)
+                        dt_end = parse_date_text(end_date_val)
 
-                    if not all_dfs:
-                        return None
+                        if not dt_start:
+                            return None
+                        if not dt_end:
+                            dt_end = dt_start
 
-                    df_all = pd.concat(all_dfs, ignore_index=True)
-                    df_all = filter_by_min_stations(df_all, min_stations)
+                        # Ensure start <= end
+                        if dt_start > dt_end:
+                            dt_start, dt_end = dt_end, dt_start
 
-                    if df_all.empty:
-                        return None
+                        # Limit range to 30 days
+                        if (dt_end - dt_start).days > 30:
+                            return None
+
+                        # Load data for each day in range
+                        all_dfs = []
+                        current_date = dt_start
+                        while current_date <= dt_end:
+                            df_day = load_image_paths_for_date(
+                                current_date, min_proba=min_conf
+                            )
+                            if not df_day.empty:
+                                all_dfs.append(df_day)
+                            current_date += timedelta(days=1)
+
+                        if not all_dfs:
+                            return None
+
+                        df_all = pd.concat(all_dfs, ignore_index=True)
+                        if place_mismatch_message(place or ""):
+                            return None
+                        df_all = filter_by_place(df_all, place or "")
+                        df_all = filter_by_min_stations(df_all, min_stations)
+
+                        if df_all.empty:
+                            return None
+
+                        date_str = (
+                            f"{dt_start.strftime('%Y%m%d')}_to_{dt_end.strftime('%Y%m%d')}"
+                            if dt_start != dt_end
+                            else dt_start.strftime("%Y%m%d")
+                        )
 
                     # Create ZIP export
                     tmp_dir = tempfile.mkdtemp()
-                    date_str = (
-                        f"{dt_start.strftime('%Y%m%d')}_to_{dt_end.strftime('%Y%m%d')}"
-                        if dt_start != dt_end
-                        else dt_start.strftime("%Y%m%d")
-                    )
                     zip_path = os.path.join(
                         tmp_dir, f"FlareSense_Export_{date_str}.zip"
                     )
@@ -1438,39 +1614,44 @@ def create_app():
 
                     return zip_path
 
+                query_inputs = [
+                    date_start,
+                    date_end,
+                    confidence_slider,
+                    min_stations_slider,
+                    order_mode,
+                    place_box,
+                    top_n,
+                ]
+
+                def _show_intensity_controls(mode):
+                    show = mode == "By intensity"
+                    return gr.update(visible=show), gr.update(visible=show)
+
+                order_mode.change(
+                    _show_intensity_controls,
+                    inputs=order_mode,
+                    outputs=[top_n, intensity_hint],
+                )
+
                 # Initial load
                 demo.load(
                     fn=load_date_bursts,
-                    inputs=[
-                        date_start,
-                        date_end,
-                        confidence_slider,
-                        min_stations_slider,
-                    ],
+                    inputs=query_inputs,
                     outputs=[date_bursts_html],
                 )
 
                 # Search button click
                 search_btn.click(
                     fn=load_date_bursts,
-                    inputs=[
-                        date_start,
-                        date_end,
-                        confidence_slider,
-                        min_stations_slider,
-                    ],
+                    inputs=query_inputs,
                     outputs=[date_bursts_html],
                 )
 
                 # Export functionality
                 export_btn.click(
                     fn=export_date_data,
-                    inputs=[
-                        date_start,
-                        date_end,
-                        confidence_slider,
-                        min_stations_slider,
-                    ],
+                    inputs=query_inputs,
                     outputs=[export_file],
                 )
 
