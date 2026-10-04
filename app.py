@@ -1,5 +1,9 @@
 import os
 import glob
+import json
+import re
+import threading
+import urllib.request
 import zipfile
 import tempfile
 from datetime import datetime, timedelta
@@ -19,6 +23,14 @@ BASE_PATH = SERVER_BURST_IMAGES_PATH
 TIMEGROUP_MINUTES = 15
 DEFAULT_MIN_PROBA = 0.5
 DEFAULT_MIN_STATIONS = 3
+# Public site that already serves the saved spectrograms. Used only when this
+# machine has no local burst archive. Set FLARESENSE_REMOTE_API= to disable.
+REMOTE_ORIGIN = os.environ.get("FLARESENSE_REMOTE_API", "https://flaresense.ch").rstrip("/")
+REMOTE_IMAGE_ROOT = "/srv/flaresense-data/burst_live_images"
+_local_archive_cached: Optional[bool] = None
+_remote_rows_cache: Dict[Tuple, list] = {}
+_remote_lock = threading.Lock()
+REMOTE_ERROR: Optional[str] = None
 
 # Your existing list of valid instruments
 from pred_live import INSTRUMENT_LIST
@@ -92,11 +104,193 @@ def re_split_non_digits(s: str) -> List[str]:
 # -----------------------------
 # DATA LOADING & TRANSFORMATIONS
 # -----------------------------
+def local_archive_has_images() -> bool:
+    """True when this machine already has saved spectrograms on disk."""
+    global _local_archive_cached
+    if _local_archive_cached is not None:
+        return _local_archive_cached
+    found = False
+    if os.path.isdir(BASE_PATH):
+        for _, _, files in os.walk(BASE_PATH):
+            if any(name.endswith(".png") for name in files):
+                found = True
+                break
+    _local_archive_cached = found
+    return found
+
+
+def image_src(path: str) -> str:
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    return f"/gradio_api/file={path}"
+
+
+def _prefer_local_file(server_path: str) -> str:
+    """Use the file on disk when it exists, otherwise the public file URL."""
+    root = REMOTE_IMAGE_ROOT.rstrip("/") + "/"
+    if server_path.startswith(root):
+        local = os.path.join(BASE_PATH, server_path[len(root) :])
+        if os.path.isfile(local):
+            return local
+    if os.path.isfile(server_path):
+        return server_path
+    if not REMOTE_ORIGIN:
+        return server_path
+    return f"{REMOTE_ORIGIN}/gradio_api/file={server_path}"
+
+
+def _empty_burst_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=[
+            "Datetime",
+            "Instrument Location",
+            "Confidence",
+            "Path",
+            "TimeGroup",
+        ]
+    )
+
+
+def _frame_from_rows(table_data: list) -> pd.DataFrame:
+    if not table_data:
+        return _empty_burst_frame()
+    df = (
+        pd.DataFrame(
+            table_data,
+            columns=["Datetime", "Instrument Location", "Confidence", "Path"],
+        )
+        .sort_values(by="Datetime", ascending=True)
+        .reset_index(drop=True)
+    )
+    df["TimeGroup"] = pd.to_datetime(df["Datetime"]).dt.floor(f"{TIMEGROUP_MINUTES}min")
+    return df
+
+
+def _row_from_image_path(path: str, min_proba: float):
+    base = os.path.basename(path.split("?", 1)[0])
+    parts = base.split("_")
+    proba = float(parts[0])
+    if proba < min_proba:
+        return None
+    antenna = "_".join(parts[1:-2])
+    if antenna not in INSTRUMENT_LIST:
+        return None
+    dt_str = parts[-2] + " " + parts[-1].replace(".png", "")
+    dt = datetime.strptime(dt_str, "%d-%m-%Y %H-%M-%S")
+    return [dt, antenna, proba, _prefer_local_file(path)]
+
+
+def _gradio_call(endpoint: str, data: list) -> str:
+    if not REMOTE_ORIGIN:
+        raise RuntimeError("Remote burst API is disabled")
+    request = urllib.request.Request(
+        f"{REMOTE_ORIGIN}/gradio_api/call/{endpoint}",
+        data=json.dumps({"data": data}).encode(),
+        headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        event_id = json.load(response)["event_id"]
+    result_request = urllib.request.Request(
+        f"{REMOTE_ORIGIN}/gradio_api/call/{endpoint}/{event_id}",
+        headers={"User-Agent": "Mozilla/5.0"},
+    )
+    with urllib.request.urlopen(result_request, timeout=90) as response:
+        body = response.read().decode()
+    for block in body.split("\n\n"):
+        if "event: complete" not in block and "event: error" not in block:
+            continue
+        kind = "error" if "event: error" in block else "complete"
+        lines = [line[5:] for line in block.splitlines() if line.startswith("data:")]
+        payload = "\n".join(lines)
+        if kind == "error":
+            raise RuntimeError(payload[:300] or "remote API error")
+        parsed = json.loads(payload)
+        if isinstance(parsed, list) and parsed:
+            return str(parsed[0])
+        return str(parsed)
+    raise RuntimeError("remote API returned no result")
+
+
+def _fetch_remote_rows(start: datetime, end: datetime) -> list:
+    """List spectrograms from flaresense.ch for an inclusive date range."""
+    global REMOTE_ERROR
+    rows = []
+    seen = set()
+    cursor = datetime(start.year, start.month, start.day)
+    last = datetime(end.year, end.month, end.day)
+    try:
+        while cursor <= last:
+            chunk_end = min(last, cursor + timedelta(days=30))
+            html = _gradio_call(
+                "load_date_bursts",
+                [
+                    cursor.strftime("%Y-%m-%d"),
+                    chunk_end.strftime("%Y-%m-%d"),
+                    0.1,
+                    1,
+                ],
+            )
+            for server_path in re.findall(
+                r"/gradio_api/file=([^'\"<>\s]+\.png)", html
+            ):
+                if server_path in seen:
+                    continue
+                seen.add(server_path)
+                row = _row_from_image_path(server_path, min_proba=0.1)
+                if row is not None:
+                    rows.append(row)
+            cursor = chunk_end + timedelta(days=1)
+        REMOTE_ERROR = None
+    except Exception as exc:
+        REMOTE_ERROR = str(exc)
+        return []
+    return rows
+
+
+def remote_burst_frame(
+    start: datetime, end: datetime, min_proba: float
+) -> pd.DataFrame:
+    start_day = datetime(start.year, start.month, start.day)
+    end_day = datetime(end.year, end.month, end.day)
+    key = (start_day, end_day)
+    with _remote_lock:
+        if key not in _remote_rows_cache:
+            _remote_rows_cache[key] = _fetch_remote_rows(start_day, end_day)
+        rows = _remote_rows_cache[key]
+    table = [row for row in rows if row[2] >= min_proba]
+    df = _frame_from_rows(table)
+    if df.empty:
+        return df
+    start_ts = pd.Timestamp(start_day)
+    end_ts = pd.Timestamp(end_day + timedelta(days=1))
+    return df[(df["Datetime"] >= start_ts) & (df["Datetime"] < end_ts)].copy()
+
+
 def load_image_paths_for_date(date_obj: datetime, min_proba: float) -> pd.DataFrame:
     """
     Scan directory for one day. Returns DataFrame:
     ['Datetime','Instrument Location','Confidence','Path','TimeGroup'].
+    When this machine has no saved images, read the same catalog from flaresense.ch.
     """
+    if not local_archive_has_images():
+        today = datetime(
+            today_date().year, today_date().month, today_date().day
+        )
+        day = datetime(date_obj.year, date_obj.month, date_obj.day)
+        window_start = today - timedelta(days=59)
+        if window_start <= day <= today:
+            df = remote_burst_frame(window_start, today, min_proba)
+        else:
+            df = remote_burst_frame(day, day, min_proba)
+        if df.empty:
+            return df
+        next_day = day + timedelta(days=1)
+        return df[
+            (df["Datetime"] >= pd.Timestamp(day))
+            & (df["Datetime"] < pd.Timestamp(next_day))
+        ].copy()
+
     year, month, day = ymd_from_date(date_obj)
     search_path = os.path.join(BASE_PATH, year, month, day, "*", "*")
 
@@ -189,6 +383,79 @@ def images_for_group(df: pd.DataFrame, group_ts: pd.Timestamp) -> List[Tuple[str
         cap = f"{row['Instrument Location']} – {row['Datetime'].strftime('%Y-%m-%d %H:%M:%S')} – {row['Confidence']:.1f}%"
         out.append((row["Path"], cap))
     return out
+
+
+def local_all_burst_frame(min_proba: float) -> pd.DataFrame:
+    """Every saved spectrogram on disk, with no day limit."""
+    dfs = []
+    if not os.path.isdir(BASE_PATH):
+        return _empty_burst_frame()
+    for year_name in os.listdir(BASE_PATH):
+        year_path = os.path.join(BASE_PATH, year_name)
+        if not year_name.isdigit() or not os.path.isdir(year_path):
+            continue
+        for month_name in os.listdir(year_path):
+            month_path = os.path.join(year_path, month_name)
+            if not os.path.isdir(month_path):
+                continue
+            for day_name in os.listdir(month_path):
+                day_path = os.path.join(month_path, day_name)
+                if not os.path.isdir(day_path):
+                    continue
+                try:
+                    day = datetime(int(year_name), int(month_name), int(day_name))
+                except ValueError:
+                    continue
+                df = load_image_paths_for_date(day, min_proba)
+                if not df.empty:
+                    dfs.append(df)
+    if not dfs:
+        return _empty_burst_frame()
+    return pd.concat(dfs, ignore_index=True)
+
+
+_latest_frame_cache: Optional[pd.DataFrame] = None
+
+
+def latest_burst_frame(min_proba: float, min_stations: int, enough_groups: int = 20) -> pd.DataFrame:
+    """
+    Bursts that pass the station rule, newest first in time.
+    No fixed day window: read the local archive, or walk the remote catalog
+    backward until enough groups are found or the catalog runs out.
+    """
+    global _latest_frame_cache
+    if _latest_frame_cache is not None:
+        return _latest_frame_cache
+
+    if local_archive_has_images():
+        df = filter_by_min_stations(local_all_burst_frame(min_proba), min_stations)
+        _latest_frame_cache = df
+        return df
+
+    frames = []
+    end = datetime(today_date().year, today_date().month, today_date().day)
+    empty_run = 0
+    found = _empty_burst_frame()
+    for _ in range(36):
+        start = end - timedelta(days=30)
+        df = remote_burst_frame(start, end, min_proba)
+        if REMOTE_ERROR:
+            break
+        if df.empty:
+            empty_run += 1
+            if empty_run >= 2:
+                break
+        else:
+            empty_run = 0
+            frames.append(df)
+            found = filter_by_min_stations(pd.concat(frames, ignore_index=True), min_stations)
+            if not found.empty and found["TimeGroup"].nunique() >= enough_groups:
+                break
+        end = start - timedelta(days=1)
+    if frames and found.empty:
+        found = filter_by_min_stations(pd.concat(frames, ignore_index=True), min_stations)
+    _latest_frame_cache = found
+    return found
 
 
 def concatenate_days(days_back: int, min_proba: float) -> pd.DataFrame:
@@ -300,32 +567,40 @@ def plot_daily_by_station(days: int = 30, min_proba: float = DEFAULT_MIN_PROBA):
     return fig
 
 
-def plot_all_data_with_ma():
-    """
-    Plot last 60 days of data with 7-day moving average.
-    Fast and simple without caching.
-    """
-    days_to_show = 60
+def collect_daily_counts(days_to_show: int) -> list:
+    """Per-day, per-station image counts. Disk when present, otherwise the API."""
     today = today_date()
+    if not local_archive_has_images():
+        start = today - timedelta(days=days_to_show - 1)
+        df = remote_burst_frame(start, today, min_proba=0.1)
+        if df.empty:
+            return []
+        grouped = (
+            df.assign(Day=pd.to_datetime(df["Datetime"]).dt.floor("D"))
+            .groupby(["Day", "Instrument Location"])
+            .size()
+            .reset_index(name="Count")
+        )
+        return [
+            {
+                "Day": row["Day"].to_pydatetime(),
+                "Instrument Location": row["Instrument Location"],
+                "Count": int(row["Count"]),
+            }
+            for _, row in grouped.iterrows()
+        ]
 
-    # Fast filesystem walk for last 60 days only
     daily_data = []
-
     for i in range(days_to_show):
         current_date = today - timedelta(days=i)
         year, month, day = ymd_from_date(current_date)
         day_path = os.path.join(BASE_PATH, year, month, day)
-
         if not os.path.exists(day_path):
             continue
-
-        # Count files per station for this day
         for station_dir in os.listdir(day_path):
             station_path = os.path.join(day_path, station_dir)
             if not os.path.isdir(station_path) or station_dir not in INSTRUMENT_LIST:
                 continue
-
-            # Count PNG files in this station directory
             try:
                 png_count = len(
                     [f for f in os.listdir(station_path) if f.endswith(".png")]
@@ -340,6 +615,16 @@ def plot_all_data_with_ma():
                     )
             except (OSError, PermissionError):
                 continue
+    return daily_data
+
+
+def plot_all_data_with_ma():
+    """
+    Plot last 60 days of data with 7-day moving average.
+    Fast and simple without caching.
+    """
+    days_to_show = 60
+    daily_data = collect_daily_counts(days_to_show)
 
     if not daily_data:
         fig = go.Figure()
@@ -428,41 +713,17 @@ def generate_burst_statistics():
     """
     days_to_show = 60
     today = today_date()
+    daily_data = collect_daily_counts(days_to_show)
 
-    # Fast count for last 60 days
     total_bursts = 0
     instrument_counts = {}
     days_with_data = set()
-
-    for i in range(days_to_show):
-        current_date = today - timedelta(days=i)
-        year, month, day = ymd_from_date(current_date)
-        day_path = os.path.join(BASE_PATH, year, month, day)
-
-        if not os.path.exists(day_path):
-            continue
-
-        day_has_data = False
-        for station_dir in os.listdir(day_path):
-            station_path = os.path.join(day_path, station_dir)
-            if not os.path.isdir(station_path) or station_dir not in INSTRUMENT_LIST:
-                continue
-
-            try:
-                png_count = len(
-                    [f for f in os.listdir(station_path) if f.endswith(".png")]
-                )
-                if png_count > 0:
-                    total_bursts += png_count
-                    instrument_counts[station_dir] = (
-                        instrument_counts.get(station_dir, 0) + png_count
-                    )
-                    day_has_data = True
-            except (OSError, PermissionError):
-                continue
-
-        if day_has_data:
-            days_with_data.add(current_date.date())
+    for entry in daily_data:
+        total_bursts += entry["Count"]
+        instrument_counts[entry["Instrument Location"]] = (
+            instrument_counts.get(entry["Instrument Location"], 0) + entry["Count"]
+        )
+        days_with_data.add(pd.to_datetime(entry["Day"]).date())
 
     if total_bursts == 0:
         return "<p>No data available for statistics.</p>"
@@ -484,38 +745,38 @@ def generate_burst_statistics():
     )
 
     html = f"""
-    <div style='background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;'>
-        <h3 style='color: #333; margin-top: 0;'>📊 Burst Detection Statistics (Last 60 Days)</h3>
+    <div class="fs-panel">
+        <h3 class="fs-title" style="margin-top: 0;">📊 Burst Detection Statistics (Last 60 Days)</h3>
         
         <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;'>
-            <div style='background: white; padding: 15px; border-radius: 5px; text-align: center;'>
-                <h4 style='margin: 0; color: #007bff;'>{total_bursts:,}</h4>
-                <p style='margin: 5px 0; color: #666;'>Total Burst Images</p>
+            <div class="fs-card" style="text-align: center;">
+                <h4 class="fs-stat-blue" style="margin: 0;">{total_bursts:,}</h4>
+                <p class="fs-muted" style="margin: 5px 0;">Total Burst Images</p>
             </div>
-            <div style='background: white; padding: 15px; border-radius: 5px; text-align: center;'>
-                <h4 style='margin: 0; color: #28a745;'>{avg_bursts_per_day:.1f}</h4>
-                <p style='margin: 5px 0; color: #666;'>Avg Images/Day</p>
+            <div class="fs-card" style="text-align: center;">
+                <h4 class="fs-stat-green" style="margin: 0;">{avg_bursts_per_day:.1f}</h4>
+                <p class="fs-muted" style="margin: 5px 0;">Avg Images/Day</p>
             </div>
-            <div style='background: white; padding: 15px; border-radius: 5px; text-align: center;'>
-                <h4 style='margin: 0; color: #ffc107;'>{total_days_with_data}</h4>
-                <p style='margin: 5px 0; color: #666;'>Days with Data</p>
+            <div class="fs-card" style="text-align: center;">
+                <h4 class="fs-stat-amber" style="margin: 0;">{total_days_with_data}</h4>
+                <p class="fs-muted" style="margin: 5px 0;">Days with Data</p>
             </div>
-            <div style='background: white; padding: 15px; border-radius: 5px; text-align: center;'>
-                <h4 style='margin: 0; color: #dc3545;'>{len(instrument_counts)}</h4>
-                <p style='margin: 5px 0; color: #666;'>Active Instruments</p>
+            <div class="fs-card" style="text-align: center;">
+                <h4 class="fs-stat-red" style="margin: 0;">{len(instrument_counts)}</h4>
+                <p class="fs-muted" style="margin: 5px 0;">Active Instruments</p>
             </div>
         </div>
         
-        <h4 style='color: #333; margin-bottom: 10px;'>🏢 Detection Images by Instrument:</h4>
+        <h4 class="fs-title" style="margin-bottom: 10px;">🏢 Detection Images by Instrument:</h4>
         <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;'>
     """
 
     for instrument, count in sorted_instruments[:15]:  # Top 15 instruments
         percentage = (count / total_bursts) * 100
         html += f"""
-            <div style='background: white; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between;'>
-                <span style='color: #333;'>{instrument}</span>
-                <span style='color: #666; font-weight: bold;'>{count:,} ({percentage:.1f}%)</span>
+            <div class="fs-row">
+                <span class="fs-title">{instrument}</span>
+                <span class="fs-muted" style="font-weight: bold;">{count:,} ({percentage:.1f}%)</span>
             </div>
         """
 
@@ -562,7 +823,7 @@ def _browser_day_core(
     # Prepare outputs
     if df.empty:
         summary_html = (
-            f"<div style='background:#fff3cd;padding:10px;border-radius:6px;'>"
+            f"<div class='fs-banner fs-banner-warn'>"
             f"No bursts found for <b>{target_date.strftime('%Y-%m-%d')}</b> "
             f"(min_conf ≥ {min_proba:.1f}, min_stations ≥ {min_stations}).</div>"
         )
@@ -578,7 +839,7 @@ def _browser_day_core(
         uniq_stations = df["Instrument Location"].nunique()
         time_groups = groups_df.shape[0]
         summary_html = (
-            f"<div style='background:#d4edda;padding:10px;border-radius:6px;'>"
+            f"<div class='fs-banner fs-banner-ok'>"
             f"<b>{target_date.strftime('%Y-%m-%d')}</b>: {total_dets} detections · "
             f"{uniq_stations} station(s) · {time_groups} group(s)</div>"
         )
@@ -735,9 +996,9 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
         # Create header: datetime on top, avg conf below in smaller text
         burst_time = group_time.strftime("%Y-%m-%d %H:%M UTC")
 
-        html_content += f"<div style='margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 8px;'>"
-        html_content += f"<h3 style='color: #333; margin-top: 0; margin-bottom: 2px;'>{burst_time}</h3>"
-        html_content += f"<p style='color: #666; font-size: 0.9em; margin-top: 0; margin-bottom: 10px;'>Avg conf: {avg_conf:.1f}%</p>"
+        html_content += "<div class='fs-group'>"
+        html_content += f"<h3 class='fs-title' style='margin-top: 0; margin-bottom: 2px;'>{burst_time}</h3>"
+        html_content += f"<p class='fs-muted' style='font-size: 0.9em; margin-top: 0; margin-bottom: 10px;'>Avg conf: {avg_conf:.1f}%</p>"
 
         # Group by instrument and show images
         html_content += "<div style='display: flex; flex-wrap: wrap; gap: 15px; position: relative; z-index: 1;'>"
@@ -749,11 +1010,12 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
             img_path: str = best_detection["Path"]
 
             html_content += f"<div class='burst-image-container' style='text-align: center; min-width: 200px;'>"
-            html_content += f"<h4 style='margin: 5px 0; color: #666; font-size: 14px;'>{instrument}</h4>"
-            html_content += f"<a href='/gradio_api/file={img_path}' target='_blank'>"
-            html_content += f"<img src='/gradio_api/file={img_path}' class='hover-zoom' style='max-width: 180px; max-height: 180px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;' alt='Burst detection' title='Click to open in new tab'>"
+            html_content += f"<h4 class='fs-muted' style='margin: 5px 0; font-size: 14px;'>{instrument}</h4>"
+            src = image_src(img_path)
+            html_content += f"<a href='{src}' target='_blank'>"
+            html_content += f"<img src='{src}' class='hover-zoom fs-thumb' style='max-width: 180px; max-height: 180px; cursor: pointer;' alt='Burst detection' title='Click to open in new tab'>"
             html_content += f"</a>"
-            html_content += f"<p style='margin: 5px 0; font-size: 12px; color: #888;'>Confidence: {best_detection['Confidence']:.1f}%</p>"
+            html_content += f"<p class='fs-faint' style='margin: 5px 0; font-size: 12px;'>Confidence: {best_detection['Confidence']:.1f}%</p>"
             html_content += "</div>"
 
         html_content += "</div></div>"
@@ -769,7 +1031,7 @@ def load_latest(days_back: int, min_proba: float, min_stations: int):
     df_all = concatenate_days(days_back, min_proba)
     df_all = filter_by_min_stations(df_all, min_stations)
     if df_all.empty:
-        msg = f"<div style='background:#fff3cd;padding:10px;border-radius:6px;'>No bursts in last {days_back} day(s).</div>"
+        msg = f"<div class='fs-banner fs-banner-warn'>No bursts in last {days_back} day(s).</div>"
         return (
             msg,
             pd.DataFrame(
@@ -784,7 +1046,7 @@ def load_latest(days_back: int, min_proba: float, min_stations: int):
     total = len(df_all)
     stations = df_all["Instrument Location"].nunique()
     msg = (
-        f"<div style='background:#e7f3ff;padding:10px;border-radius:6px;'>"
+        f"<div class='fs-banner fs-banner-info'>"
         f"Last {days_back} day(s): {total} detections · {stations} station(s) · {len(groups)} group(s)</div>"
     )
 
@@ -813,21 +1075,29 @@ def load_latest(days_back: int, min_proba: float, min_stations: int):
 # -----------------------------
 # BUILD APP
 # -----------------------------
-def load_latest_bursts():
-    """Load latest bursts with hardcoded settings: 3 days, conf ≥ 0.5, min 3 stations"""
-    df_all = concatenate_days(days_back=3, min_proba=DEFAULT_MIN_PROBA)
-    df_all = filter_by_min_stations(df_all, min_stations=DEFAULT_MIN_STATIONS)
+def load_latest_bursts(n_show):
+    """Load the newest burst groups: conf ≥ 0.5, min 3 stations, no day limit."""
+    n_show = max(1, int(n_show))
+    df_all = latest_burst_frame(
+        DEFAULT_MIN_PROBA, DEFAULT_MIN_STATIONS, enough_groups=20
+    )
 
     if df_all.empty:
-        return "<p>No recent bursts found with the specified criteria.</p>"
+        if REMOTE_ERROR and not local_archive_has_images():
+            return f"<p>Could not read burst images from flaresense.ch: {REMOTE_ERROR}</p>"
+        return "<p>No bursts with confidence ≥ 0.5 and at least 3 stations.</p>"
 
-    # Create scrollable burst groups with the SAME format that was working before
-    html_content = create_scrollable_burst_groups(df_all)
+    groups = sorted(df_all["TimeGroup"].unique(), reverse=True)
+    shown = groups[:n_show]
+    df_shown = df_all[df_all["TimeGroup"].isin(shown)]
+    html_content = create_scrollable_burst_groups(df_shown)
 
-    # Add explanatory note
-    note = """
-    <div style='margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #666;'>
-        <em>Plots show last 3 days, with confidence ≥ 0.5 and at least 3 stations.</em>
+    source = ""
+    if not local_archive_has_images():
+        source = " Spectrograms are loaded from flaresense.ch."
+    note = f"""
+    <div class="fs-note">
+        <em>Showing the {len(shown)} newest of {len(groups)} groups with confidence ≥ 0.5 and at least 3 stations.{source}</em>
     </div>
     """
 
@@ -840,6 +1110,43 @@ def create_app():
         css="""
         .sidebar { background-color: #f8f9fa; padding: 15px; border-radius: 8px; }
         .section-card { border: 1px solid #ddd; padding: 12px; border-radius: 8px; background: #fff; }
+        .fs-panel { background: #f8f9fa; color: #27272a; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .fs-card { background: #fff; padding: 15px; border-radius: 5px; }
+        .fs-row { background: #fff; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; gap: 12px; }
+        .fs-title { color: #27272a; }
+        .fs-muted { color: #52525b; }
+        .fs-faint { color: #71717a; }
+        .fs-note { margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #52525b; }
+        .fs-group { margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
+        .fs-banner { padding: 10px; border-radius: 6px; color: #27272a; }
+        .fs-banner-warn { background: #fff3cd; }
+        .fs-banner-ok { background: #d4edda; }
+        .fs-banner-info { background: #e7f3ff; }
+        .fs-stat-blue { color: #007bff; }
+        .fs-stat-green { color: #28a745; }
+        .fs-stat-amber { color: #b45309; }
+        .fs-stat-red { color: #dc3545; }
+        .fs-thumb { border: 1px solid #ccc; border-radius: 4px; }
+        .dark .sidebar { background: #18181b; }
+        .dark .section-card { background: transparent; border-color: #3f3f46; }
+        .dark .fs-panel { background: #18181b; color: #f4f4f5; }
+        .dark .fs-note { background: #18181b; color: #f4f4f5; }
+        .dark .fs-card { background: #27272a; }
+        .dark .fs-row { background: #27272a; }
+        .dark .fs-title { color: #f4f4f5; }
+        .dark .fs-muted { color: #d4d4d8; }
+        .dark .fs-faint { color: #a1a1aa; }
+        .dark .fs-group { border-color: #3f3f46; }
+        .dark .fs-thumb { border-color: #3f3f46; }
+        .dark .fs-banner-warn { background: #3f2e0a; color: #fde68a; }
+        .dark .fs-banner-ok { background: #143024; color: #bbf7d0; }
+        .dark .fs-banner-info { background: #172554; color: #dbeafe; }
+        .dark .fs-stat-amber { color: #facc15; }
+        .dark .js-plotly-plot .svg-container > .main-svg:first-child { background: #27272a !important; }
+        .dark .js-plotly-plot .bg { fill: #27272a !important; }
+        .dark .js-plotly-plot text { fill: #f4f4f5 !important; }
+        .dark .js-plotly-plot .xgrid { stroke: rgba(255, 255, 255, 0.18) !important; }
+        .dark .js-plotly-plot .ygrid { stroke: rgba(255, 255, 255, 0.18) !important; }
         """,
     ) as demo:
 
@@ -863,24 +1170,33 @@ def create_app():
             # -----------------------------------------------------
             with gr.TabItem("🔥 Latest"):
                 gr.Markdown("### Recent Solar Radio Burst Detections")
+                n_latest = gr.Slider(
+                    label="Latest groups to show",
+                    minimum=1,
+                    maximum=20,
+                    value=5,
+                    step=1,
+                )
 
-                # Latest tab shows scrollable bursts with hardcoded settings
                 latest_bursts_html = gr.HTML(
                     value="<div style='text-align: center; padding: 40px;'><p style='font-size: 1.2em;'>⏳ Loading latest bursts...</p></div>"
                 )
 
-                # Load latest bursts on page load with fixed settings
                 demo.load(
                     fn=load_latest_bursts,
-                    inputs=None,
+                    inputs=n_latest,
+                    outputs=latest_bursts_html,
+                )
+                n_latest.change(
+                    fn=load_latest_bursts,
+                    inputs=n_latest,
                     outputs=latest_bursts_html,
                 )
 
-                # Refresh button for latest bursts
                 refresh_latest_btn = gr.Button("🔄 Refresh Latest", variant="primary")
                 refresh_latest_btn.click(
                     fn=load_latest_bursts,
-                    inputs=None,
+                    inputs=n_latest,
                     outputs=latest_bursts_html,
                 )
 
@@ -925,11 +1241,11 @@ def create_app():
 
                         gr.Markdown("### Filters", elem_classes=["section-card"])
                         confidence_slider = gr.Slider(
-                            minimum=0.1,
-                            maximum=0.9,
-                            value=0.5,
-                            step=0.1,
-                            label="Minimum Confidence",
+                            minimum=10,
+                            maximum=90,
+                            value=50,
+                            step=1,
+                            label="Minimum Confidence (%)",
                         )
                         min_stations_slider = gr.Slider(
                             minimum=1,
@@ -943,7 +1259,7 @@ def create_app():
 
                         gr.Markdown("### Export", elem_classes=["section-card"])
                         export_btn = gr.Button(
-                            "📦 Download ZIP (Bursts + Images)", variant="secondary"
+                            "📦 Download ZIP (FITS + Images)", variant="secondary"
                         )
                         export_file = gr.File(
                             label="Download Export", interactive=False
@@ -1009,7 +1325,7 @@ def create_app():
                             if dt_start == dt_end
                             else f"{dt_start.strftime('%Y-%m-%d')} to {dt_end.strftime('%Y-%m-%d')}"
                         )
-                        return f"<p>No bursts found for {date_range_str} with confidence ≥ {min_conf*100:.0f}%.</p>"
+                        return f"<p>No bursts found for {date_range_str} with confidence ≥ {min_conf:.0f}%.</p>"
 
                     df_all = pd.concat(all_dfs, ignore_index=True)
 
@@ -1032,7 +1348,7 @@ def create_app():
                             if dt_start == dt_end
                             else f"{dt_start.strftime('%Y-%m-%d')} to {dt_end.strftime('%Y-%m-%d')}"
                         )
-                        return f"<p>No bursts found for {date_range_str} with minimum {min_stations} station(s) and confidence ≥ {min_conf*100:.0f}%.</p>"
+                        return f"<p>No bursts found for {date_range_str} with minimum {min_stations} station(s) and confidence ≥ {min_conf:.0f}%.</p>"
 
                     return create_scrollable_burst_groups(df_filtered)
 
@@ -1100,13 +1416,25 @@ def create_app():
                         # Images
                         for _, row in df_all.iterrows():
                             img_path = row["Path"]
-                            if os.path.exists(img_path):
-                                burst_time = row["Datetime"].strftime("%H-%M-%S")
-                                burst_date = row["Datetime"].strftime("%Y-%m-%d")
-                                confidence = row["Confidence"]
-                                instrument = row["Instrument Location"]
-                                filename = f"{burst_date}_{burst_time}_{instrument}_{confidence:.1f}pct.png"
-                                zipf.write(img_path, f"images/{filename}")
+                            burst_time = row["Datetime"].strftime("%H-%M-%S")
+                            burst_date = row["Datetime"].strftime("%Y-%m-%d")
+                            confidence = row["Confidence"]
+                            instrument = row["Instrument Location"]
+                            filename = f"images/{burst_date}_{burst_time}_{instrument}_{confidence:.1f}pct.png"
+                            if os.path.isfile(img_path):
+                                zipf.write(img_path, filename)
+                            elif str(img_path).startswith(("http://", "https://")):
+                                try:
+                                    request = urllib.request.Request(
+                                        img_path,
+                                        headers={"User-Agent": "Mozilla/5.0"},
+                                    )
+                                    with urllib.request.urlopen(
+                                        request, timeout=60
+                                    ) as response:
+                                        zipf.writestr(filename, response.read())
+                                except OSError:
+                                    continue
 
                     return zip_path
 
