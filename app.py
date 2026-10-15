@@ -484,38 +484,38 @@ def generate_burst_statistics():
     )
 
     html = f"""
-    <div style='background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px;'>
-        <h3 style='color: #333; margin-top: 0;'>📊 Burst Detection Statistics (Last 60 Days)</h3>
+    <div class="fs-panel">
+        <h3 class="fs-title" style="margin-top: 0;">📊 Burst Detection Statistics (Last 60 Days)</h3>
         
         <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;'>
-            <div style='background: white; padding: 15px; border-radius: 5px; text-align: center;'>
-                <h4 style='margin: 0; color: #007bff;'>{total_bursts:,}</h4>
-                <p style='margin: 5px 0; color: #666;'>Total Burst Images</p>
+            <div class="fs-card" style="text-align: center;">
+                <h4 class="fs-stat-blue" style="margin: 0;">{total_bursts:,}</h4>
+                <p class="fs-muted" style="margin: 5px 0;">Total Burst Images</p>
             </div>
-            <div style='background: white; padding: 15px; border-radius: 5px; text-align: center;'>
-                <h4 style='margin: 0; color: #28a745;'>{avg_bursts_per_day:.1f}</h4>
-                <p style='margin: 5px 0; color: #666;'>Avg Images/Day</p>
+            <div class="fs-card" style="text-align: center;">
+                <h4 class="fs-stat-green" style="margin: 0;">{avg_bursts_per_day:.1f}</h4>
+                <p class="fs-muted" style="margin: 5px 0;">Avg Images/Day</p>
             </div>
-            <div style='background: white; padding: 15px; border-radius: 5px; text-align: center;'>
-                <h4 style='margin: 0; color: #ffc107;'>{total_days_with_data}</h4>
-                <p style='margin: 5px 0; color: #666;'>Days with Data</p>
+            <div class="fs-card" style="text-align: center;">
+                <h4 class="fs-stat-amber" style="margin: 0;">{total_days_with_data}</h4>
+                <p class="fs-muted" style="margin: 5px 0;">Days with Data</p>
             </div>
-            <div style='background: white; padding: 15px; border-radius: 5px; text-align: center;'>
-                <h4 style='margin: 0; color: #dc3545;'>{len(instrument_counts)}</h4>
-                <p style='margin: 5px 0; color: #666;'>Active Instruments</p>
+            <div class="fs-card" style="text-align: center;">
+                <h4 class="fs-stat-red" style="margin: 0;">{len(instrument_counts)}</h4>
+                <p class="fs-muted" style="margin: 5px 0;">Active Instruments</p>
             </div>
         </div>
         
-        <h4 style='color: #333; margin-bottom: 10px;'>🏢 Detection Images by Instrument:</h4>
+        <h4 class="fs-title" style="margin-bottom: 10px;">🏢 Detection Images by Instrument:</h4>
         <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;'>
     """
 
     for instrument, count in sorted_instruments[:15]:  # Top 15 instruments
         percentage = (count / total_bursts) * 100
         html += f"""
-            <div style='background: white; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between;'>
-                <span style='color: #333;'>{instrument}</span>
-                <span style='color: #666; font-weight: bold;'>{count:,} ({percentage:.1f}%)</span>
+            <div class="fs-row">
+                <span class="fs-title">{instrument}</span>
+                <span class="fs-muted" style="font-weight: bold;">{count:,} ({percentage:.1f}%)</span>
             </div>
         """
 
@@ -562,7 +562,7 @@ def _browser_day_core(
     # Prepare outputs
     if df.empty:
         summary_html = (
-            f"<div style='background:#fff3cd;padding:10px;border-radius:6px;'>"
+            f"<div class='fs-banner fs-banner-warn'>"
             f"No bursts found for <b>{target_date.strftime('%Y-%m-%d')}</b> "
             f"(min_conf ≥ {min_proba:.1f}, min_stations ≥ {min_stations}).</div>"
         )
@@ -578,7 +578,7 @@ def _browser_day_core(
         uniq_stations = df["Instrument Location"].nunique()
         time_groups = groups_df.shape[0]
         summary_html = (
-            f"<div style='background:#d4edda;padding:10px;border-radius:6px;'>"
+            f"<div class='fs-banner fs-banner-ok'>"
             f"<b>{target_date.strftime('%Y-%m-%d')}</b>: {total_dets} detections · "
             f"{uniq_stations} station(s) · {time_groups} group(s)</div>"
         )
@@ -735,9 +735,9 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
         # Create header: datetime on top, avg conf below in smaller text
         burst_time = group_time.strftime("%Y-%m-%d %H:%M UTC")
 
-        html_content += f"<div style='margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 8px;'>"
-        html_content += f"<h3 style='color: #333; margin-top: 0; margin-bottom: 2px;'>{burst_time}</h3>"
-        html_content += f"<p style='color: #666; font-size: 0.9em; margin-top: 0; margin-bottom: 10px;'>Avg conf: {avg_conf:.1f}%</p>"
+        html_content += "<div class='fs-group'>"
+        html_content += f"<h3 class='fs-title' style='margin-top: 0; margin-bottom: 2px;'>{burst_time}</h3>"
+        html_content += f"<p class='fs-muted' style='font-size: 0.9em; margin-top: 0; margin-bottom: 10px;'>Avg conf: {avg_conf:.1f}%</p>"
 
         # Group by instrument and show images
         html_content += "<div style='display: flex; flex-wrap: wrap; gap: 15px; position: relative; z-index: 1;'>"
@@ -749,11 +749,11 @@ def create_scrollable_burst_groups(df_all: pd.DataFrame) -> str:
             img_path: str = best_detection["Path"]
 
             html_content += f"<div class='burst-image-container' style='text-align: center; min-width: 200px;'>"
-            html_content += f"<h4 style='margin: 5px 0; color: #666; font-size: 14px;'>{instrument}</h4>"
+            html_content += f"<h4 class='fs-muted' style='margin: 5px 0; font-size: 14px;'>{instrument}</h4>"
             html_content += f"<a href='/gradio_api/file={img_path}' target='_blank'>"
-            html_content += f"<img src='/gradio_api/file={img_path}' class='hover-zoom' style='max-width: 180px; max-height: 180px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;' alt='Burst detection' title='Click to open in new tab'>"
+            html_content += f"<img src='/gradio_api/file={img_path}' class='hover-zoom fs-thumb' style='max-width: 180px; max-height: 180px; cursor: pointer;' alt='Burst detection' title='Click to open in new tab'>"
             html_content += f"</a>"
-            html_content += f"<p style='margin: 5px 0; font-size: 12px; color: #888;'>Confidence: {best_detection['Confidence']:.1f}%</p>"
+            html_content += f"<p class='fs-faint' style='margin: 5px 0; font-size: 12px;'>Confidence: {best_detection['Confidence']:.1f}%</p>"
             html_content += "</div>"
 
         html_content += "</div></div>"
@@ -769,7 +769,7 @@ def load_latest(days_back: int, min_proba: float, min_stations: int):
     df_all = concatenate_days(days_back, min_proba)
     df_all = filter_by_min_stations(df_all, min_stations)
     if df_all.empty:
-        msg = f"<div style='background:#fff3cd;padding:10px;border-radius:6px;'>No bursts in last {days_back} day(s).</div>"
+        msg = f"<div class='fs-banner fs-banner-warn'>No bursts in last {days_back} day(s).</div>"
         return (
             msg,
             pd.DataFrame(
@@ -784,7 +784,7 @@ def load_latest(days_back: int, min_proba: float, min_stations: int):
     total = len(df_all)
     stations = df_all["Instrument Location"].nunique()
     msg = (
-        f"<div style='background:#e7f3ff;padding:10px;border-radius:6px;'>"
+        f"<div class='fs-banner fs-banner-info'>"
         f"Last {days_back} day(s): {total} detections · {stations} station(s) · {len(groups)} group(s)</div>"
     )
 
@@ -826,7 +826,7 @@ def load_latest_bursts():
 
     # Add explanatory note
     note = """
-    <div style='margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #666;'>
+    <div class="fs-note">
         <em>Plots show last 3 days, with confidence ≥ 0.5 and at least 3 stations.</em>
     </div>
     """
@@ -840,6 +840,43 @@ def create_app():
         css="""
         .sidebar { background-color: #f8f9fa; padding: 15px; border-radius: 8px; }
         .section-card { border: 1px solid #ddd; padding: 12px; border-radius: 8px; background: #fff; }
+        .fs-panel { background: #f8f9fa; color: #27272a; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .fs-card { background: #fff; padding: 15px; border-radius: 5px; }
+        .fs-row { background: #fff; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; gap: 12px; }
+        .fs-title { color: #27272a; }
+        .fs-muted { color: #52525b; }
+        .fs-faint { color: #71717a; }
+        .fs-note { margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9em; color: #52525b; }
+        .fs-group { margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
+        .fs-banner { padding: 10px; border-radius: 6px; color: #27272a; }
+        .fs-banner-warn { background: #fff3cd; }
+        .fs-banner-ok { background: #d4edda; }
+        .fs-banner-info { background: #e7f3ff; }
+        .fs-stat-blue { color: #007bff; }
+        .fs-stat-green { color: #28a745; }
+        .fs-stat-amber { color: #b45309; }
+        .fs-stat-red { color: #dc3545; }
+        .fs-thumb { border: 1px solid #ccc; border-radius: 4px; }
+        .dark .sidebar { background: #18181b; }
+        .dark .section-card { background: transparent; border-color: #3f3f46; }
+        .dark .fs-panel { background: #18181b; color: #f4f4f5; }
+        .dark .fs-note { background: #18181b; color: #f4f4f5; }
+        .dark .fs-card { background: #27272a; }
+        .dark .fs-row { background: #27272a; }
+        .dark .fs-title { color: #f4f4f5; }
+        .dark .fs-muted { color: #d4d4d8; }
+        .dark .fs-faint { color: #a1a1aa; }
+        .dark .fs-group { border-color: #3f3f46; }
+        .dark .fs-thumb { border-color: #3f3f46; }
+        .dark .fs-banner-warn { background: #3f2e0a; color: #fde68a; }
+        .dark .fs-banner-ok { background: #143024; color: #bbf7d0; }
+        .dark .fs-banner-info { background: #172554; color: #dbeafe; }
+        .dark .fs-stat-amber { color: #facc15; }
+        .dark .js-plotly-plot .svg-container > .main-svg:first-child { background: #27272a !important; }
+        .dark .js-plotly-plot .bg { fill: #27272a !important; }
+        .dark .js-plotly-plot text { fill: #f4f4f5 !important; }
+        .dark .js-plotly-plot .xgrid { stroke: rgba(255, 255, 255, 0.18) !important; }
+        .dark .js-plotly-plot .ygrid { stroke: rgba(255, 255, 255, 0.18) !important; }
         """,
     ) as demo:
 
